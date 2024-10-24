@@ -1,0 +1,118 @@
+<div class="manga-viewer">
+  <div class="header">
+    <div class="header-content">
+      <div class="manga-title">
+        <h2 *ngIf="currentManga">{{ currentManga.title }}</h2>
+      </div>
+      <div class="header-controls">
+        <div class="search-controls">
+          <div class="search-container" [class.visible]="isSearchVisible">
+            <input 
+              type="text" 
+              [ngModel]="searchTerm"
+              (input)="onSearchInput($event)"
+              placeholder="漫画を検索..."
+              class="search-input"
+            >
+          </div>
+          <button class="search-toggle" (click)="toggleSearch()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+        </div>
+        <button class="menu-toggle" (click)="toggleMenu()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu Overlay -->
+  <div class="menu-overlay" [class.visible]="isMenuVisible" (click)="closeMenu()">
+    <div class="menu-content" (click)="$event.stopPropagation()">
+      <button class="close-menu" (click)="closeMenu()">×</button>
+      <div class="menu-items">
+        <h3>アプリの利用方法</h3>
+        <ul>
+          <li>画像をタップすると拡大表示できます</li>
+          <li>左右スワイプで画像を切り替えできます</li>
+          <li>「商品ページへ」ボタンで詳細を確認できます</li>
+          <li>検索アイコンをタップして作品を検索できます</li>
+        </ul>
+        <div class="menu-links">
+          <a href="https://ermncontent.com/" target="_blank" rel="noopener noreferrer" class="company-link">
+            運営会社ホームページ
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading">
+    Loading...
+  </div>
+  
+  <div *ngIf="!isLoading && currentManga" class="manga-content">
+    <div class="preview-container" (click)="showImageViewer()">
+      <img 
+        [src]="currentManga.imageUrl" 
+        [alt]="currentManga.title"
+        class="preview-image"
+      >
+    </div>
+    
+    <div class="controls">
+      <button (click)="previousManga()" class="nav-button" [disabled]="currentIndex === 0">
+        前へ
+      </button>
+      <button (click)="goToProduct()" class="buy-button">
+        商品ページへ
+      </button>
+      <button (click)="nextManga()" class="nav-button" [disabled]="currentIndex >= mangaList.length - 1">
+        次へ
+      </button>
+      <div class="fanza-credit">
+        <a href="https://affiliate.dmm.com/api/">
+          <img src="https://p.dmm.co.jp/p/affiliate/web_service/r18_135_17.gif" width="135" height="17" alt="WEB SERVICE BY FANZA">
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && !currentManga && mangaList.length === 0" class="no-results">
+    検索結果が見つかりませんでした
+  </div>
+
+  <!-- Image Viewer Overlay -->
+  <div *ngIf="isImageViewerVisible" class="image-viewer-overlay" (click)="hideImageViewer()">
+    <div class="image-viewer-content" (click)="$event.stopPropagation()">
+      <img 
+        [src]="getCurrentImage()" 
+        [alt]="currentManga?.title"
+        class="viewer-image"
+        (touchstart)="onSwipe($event, 'left')"
+        (touchend)="onSwipe($event, 'right')"
+      >
+      <div class="viewer-controls">
+        <button class="viewer-nav-button" (click)="previousImage()" *ngIf="currentImageIndex > 0">
+          ←
+        </button>
+        <button class="viewer-nav-button" (click)="nextImage()" *ngIf="currentManga?.sampleImageUrls?.length">
+          →
+        </button>
+      </div>
+      <button class="close-button" (click)="hideImageViewer()">×</button>
+    </div>
+  </div>
+</div>
