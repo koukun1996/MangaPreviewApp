@@ -57,8 +57,9 @@ function transformApiResponse(data) {
 
   return data.result.items.map(item => ({
     title: item.title,
-    url: item.URL,
-    imageUrl: item.imageURL
+    affiliateUrl: item.affiliateURL,
+    tachiyomiUrl: item.tachiyomi?.affiliateURL,
+    imageUrl: item.imageURL.large
   }));
 }
 

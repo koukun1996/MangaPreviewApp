@@ -60,7 +60,7 @@
   </div>
 
   <div *ngIf="isLoading" class="loading">
-    Loading...
+    えっちな漫画をロード中...
   </div>
   
   <div *ngIf="!isLoading && currentManga" class="manga-content">
@@ -79,14 +79,17 @@
       <button (click)="goToProduct()" class="buy-button">
         商品ページへ
       </button>
+      <button (click)="goToTachiyomi()" class="tachiyomi-button">
+        立ち読みページへ
+      </button>
       <button (click)="nextManga()" class="nav-button" [disabled]="currentIndex >= mangaList.length - 1">
         次へ
       </button>
-      <div class="fanza-credit">
-        <a href="https://affiliate.dmm.com/api/">
-          <img src="https://p.dmm.co.jp/p/affiliate/web_service/r18_135_17.gif" width="135" height="17" alt="WEB SERVICE BY FANZA">
-        </a>
-      </div>
+    </div>
+    <div class="fanza-credit">
+      <a href="https://affiliate.dmm.com/api/">
+        <img src="https://p.dmm.co.jp/p/affiliate/web_service/r18_135_17.gif" width="135" height="17" alt="WEB SERVICE BY FANZA">
+      </a>
     </div>
   </div>
 

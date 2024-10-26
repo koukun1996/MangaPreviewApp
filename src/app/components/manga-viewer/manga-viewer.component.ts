@@ -129,6 +129,12 @@ export class MangaViewerComponent implements OnInit {
     }
   }
 
+  goToTachiyomi() {
+    if (this.currentManga?.tachiyomiUrl) {
+      window.open(this.currentManga.tachiyomiUrl, '_blank');
+    }
+  }
+
   showImageViewer() {
     if (this.currentManga?.imageUrl) {
       this.isImageViewerVisible = true;
