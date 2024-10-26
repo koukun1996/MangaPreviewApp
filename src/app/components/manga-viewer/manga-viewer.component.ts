@@ -63,8 +63,9 @@ export class MangaViewerComponent implements OnInit {
   }
 
   onSearchInput(event: Event) {
-    const term = (event.target as HTMLInputElement).value;
-    this.searchSubject.next(term);
+    const input = event.target as HTMLInputElement;
+    this.searchTerm = input.value;
+    this.searchSubject.next(this.searchTerm);
   }
 
   private performSearch(term: string) {
@@ -82,7 +83,7 @@ export class MangaViewerComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error loading manga:', error);
+        console.error('エラーが発生しました:', error);
         this.isLoading = false;
       }
     });
