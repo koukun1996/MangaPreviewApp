@@ -145,7 +145,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 300px;
+  width: 350px;
   height: 100%;
   background: #1a1a1a;
   padding: 2rem;
@@ -336,7 +336,7 @@
 
 .tachiyomi-button {
   padding: 12px 20px;
-  background: #ff6b6b;
+  background: #32cd32;
   color: white;
   border: none;
   border-radius: 5px;
@@ -352,11 +352,11 @@
   }
 
   &:hover {
-    background: #ff5252;
+    background: #2eb82e;
   }
-
+  
   &:active {
-    background: #ff3939;
+    background: #29a329;
   }
 }
 
