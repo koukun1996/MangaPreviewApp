@@ -1,11 +1,11 @@
 {
-  "name": "manga-preview-app",
+  "name": "MangaPreviewApp",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "ng": "ng",
-    "start": "concurrently \"ng serve\" \"node server/index.js\"",
-    "build": "ng build",
-    "server": "node server/index.js"
+    "start": "node server/index.js",
+    "build": "ng build --configuration production",
+    "dev": "concurrently \"ng serve\" \"node server/index.js\""
   },
   "dependencies": {
     "@angular/animations": "^18.1.0",
