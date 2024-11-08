@@ -1,29 +1,27 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); // pathモジュールを使用
-const { mangaRouter } = require('./routes/mangaRoutes'); // 新しいファイル名を使用
-require('dotenv').config(); // 環境変数を読み込む
+const path = require('path');
+const { mangaRouter } = require('./routes/mangaRoutes');
 
 const app = express();
 
-// CORSとJSONリクエストの設定
 app.use(cors());
 app.use(express.json());
 
-// フロントエンドの静的ファイルを配信する設定
-app.use(express.static(path.join(__dirname, 'public/browser'))); // 正しいパスを設定
+// 静的ファイルのパス設定
+const staticPath = path.join(__dirname, 'public/browser');
+app.use(express.static(staticPath));
 
 // APIエンドポイントの設定
-app.use('/api/manga', mangaRouter); // APIエンドポイントを設定
+app.use('/api/manga', mangaRouter);
 
-// すべてのルートに対するリクエストをindex.htmlにルーティング（API以外）
+// すべてのルートに対するリクエストをindex.htmlにルーティング
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/browser', 'index.html')); // 正しいパスを設定
+  res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// サーバーのポート設定と起動
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
 });
-

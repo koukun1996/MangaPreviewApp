@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  app-development:
+    build:
+      context: .
+      target: development
+    ports:
+      - "3000:3000"  # 開発環境は3000ポートで公開
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+
+  app-production:
+    build:
+      context: .
+      target: production
+    ports:
+      - "3001:3000"  # 本番環境は3001ポートで公開
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis
+
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"

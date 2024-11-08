@@ -45,7 +45,7 @@ async function fetchMangaList(keyword = '') {
     const response = await axios.get(API_BASE_URL, { params });
     return transformApiResponse(response.data);
   } catch (error) {
-    console.error('FANZA APIから漫画を取得中にエラーが発生しました:', error.message);
+    console.error('FANZA APIから漫画を取得中にエラーが発生しました:', error.response?.data || error.message);
     throw new Error('漫画データの取得に失敗しました');
   }
 }
