@@ -3,13 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MangaService } from '../../services/manga.service';
 import { Manga } from '../../models/manga.interface';
-import { SafeUrlPipe } from '../../pipes/safe-url.pipe';
 import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 
 @Component({
   selector: 'app-manga-viewer',
   standalone: true,
-  imports: [CommonModule, FormsModule, SafeUrlPipe],
+  imports: [CommonModule, FormsModule],
   templateUrl: './manga-viewer.component.html',
   styleUrls: ['./manga-viewer.component.scss']
 })
