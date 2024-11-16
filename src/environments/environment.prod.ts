@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://eromanga-tachiyomi-shi.net',
+  apiUrl: 'https://128.199.73.21:3000',
 };
