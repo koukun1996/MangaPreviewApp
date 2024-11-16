@@ -1,11 +1,13 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { mangaRouter } = require('./routes/mangaRoutes');
 
 const app = express();
+
+// 'X-Powered-By'ヘッダーを無効化
+app.disable('x-powered-by');
 
 // trust first proxy
 app.set('trust proxy', 1);
@@ -16,9 +18,6 @@ const limiter = rateLimit({
   max: 100, // 各IPからの最大リクエスト数
 });
 app.use(limiter);
-
-// CORSの設定
-app.use(cors());
 
 // リクエストのパース
 app.use(express.json());
