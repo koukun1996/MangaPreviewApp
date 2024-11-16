@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === 'development') {
         "default-src": ["'self'"],
         "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         "style-src": ["'self'", "'unsafe-inline'"],
-        "connect-src": ["'self'", "http://localhost:3000", "https://128.199.73.21:3000"], // 開発環境でのAPI呼び出しを許可
+        "connect-src": ["'self'", "http://localhost:3000"], // 開発環境でのAPI呼び出しを許可
         "script-src-attr": ["'self'", "'unsafe-inline'"],
       },
     })
@@ -28,13 +28,12 @@ if (process.env.NODE_ENV === 'development') {
         "default-src": ["'self'"],
         "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         "style-src": ["'self'", "'unsafe-inline'"],
-        "connect-src": ["'self'", "https://eromanga-tachiyomi-shi.net", "https://128.199.73.21:3000"], // 本番環境でのAPI呼び出しを許可
+        "connect-src": ["'self'", "https://eromanga-tachiyomi-shi.net"], // 本番環境でのAPI呼び出しを許可
         "script-src-attr": ["'self'", "'unsafe-inline'"],
       },
     })
   );
 }
-
 
 app.use(cors());
 app.use(express.json());
@@ -59,9 +58,9 @@ if (process.env.NODE_ENV === 'test') {
 
 // サーバーの起動を条件付きにする
 if (require.main === module) {
-  const PORT = process.env.PORT || 3001;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, '::', () => {
+    console.log(`Server is running on port ${PORT}`);
   });
 }
 
