@@ -22,6 +22,12 @@ app.use(limiter);
 // リクエストのパース
 app.use(express.json());
 
+// 'Content-Security-Policy'ヘッダーを削除するミドルウェアを追加
+app.use((req, res, next) => {
+  res.removeHeader('Content-Security-Policy');
+  next();
+});
+
 // 静的ファイルのパス設定
 const staticPath = path.join(__dirname, 'public/browser');
 app.use(express.static(staticPath));
