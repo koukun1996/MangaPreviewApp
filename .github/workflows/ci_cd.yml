@@ -53,8 +53,13 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # MangaPreviewApp ディレクトリに移動
             cd ~/MangaPreviewApp
+            # リモートから最新の変更を取得して反映
             git fetch --all
             git reset --hard origin/main
+            # 依存関係のインストール
             npm install --production
-            pm2 restart manga-preview-app
+            # PM2 プロセスを再起動
+            pm2 delete manga-preview-app || true
+            pm2 start server/index.js --name "manga-preview-app"
