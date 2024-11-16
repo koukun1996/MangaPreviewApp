@@ -3,12 +3,15 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit'); // 追加: レートリミッターの導入
+const rateLimit = require('express-rate-limit');
 const { mangaRouter } = require('./routes/mangaRoutes');
 
 const app = express();
 
-// レートリミッターの設定（セキュリティ強化のため）
+// trust first proxy
+app.set('trust proxy', 1);
+
+// レートリミッターの設定
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分間
   max: 100, // 各IPからの最大リクエスト数
