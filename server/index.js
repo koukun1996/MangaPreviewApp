@@ -13,9 +13,8 @@ if (process.env.NODE_ENV === 'development') {
     helmet.contentSecurityPolicy({
       directives: {
         "default-src": ["'self'"],
-        "script-src": ["'self'", "'unsafe-inline'"],
-        "script-src-attr": ["'unsafe-inline'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
+        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // 'unsafe-inline' と 'unsafe-eval' を許可
+        "style-src": ["'self'", "'unsafe-inline'"], // 'unsafe-inline' を許可してインラインスタイルを使用可能に
         "connect-src": ["'self'", "http://localhost:3000"], // 開発環境でのAPI呼び出しを許可
       },
     })
@@ -26,8 +25,8 @@ if (process.env.NODE_ENV === 'development') {
     helmet.contentSecurityPolicy({
       directives: {
         "default-src": ["'self'"],
-        "script-src": ["'self'"],
-        "style-src": ["'self'"],
+        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // 必要に応じて 'unsafe-inline' と 'unsafe-eval' を追加
+        "style-src": ["'self'", "'unsafe-inline'"], // インラインスタイルを許可
         "connect-src": ["'self'", "https://eromanga-tachiyomi-shi.net"], // 本番環境でのAPI呼び出しを許可
       },
     })
