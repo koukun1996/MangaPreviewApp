@@ -5,8 +5,8 @@ const { query, validationResult } = require('express-validator'); // express-val
 const router = express.Router();
 
 router.get('/search', [
-  // バリデーションルールを定義
-  query('keyword').notEmpty().withMessage('Keyword is required')
+  // バリデーションルールを変更
+  query('keyword').optional() // keywordを任意に
 ], async (req, res, next) => {
   // バリデーション結果をチェック
   const errors = validationResult(req);
@@ -16,7 +16,7 @@ router.get('/search', [
   }
 
   try {
-    const { keyword } = req.query;
+    const { keyword = '' } = req.query; // keywordが空の場合には空文字列を使用
     console.log(`Received request with keyword: ${keyword}`); // デバッグ用ログ
     const mangaList = await fetchMangaList(keyword); // fetchMangaList関数を呼び出し
     res.json(mangaList);
