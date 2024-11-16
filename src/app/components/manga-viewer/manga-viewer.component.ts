@@ -24,6 +24,9 @@ export class MangaViewerComponent implements OnInit {
   currentImageIndex = 0;
   isImageViewerVisible = false;
 
+  // クラスのプロパティとして_swipeStartを宣言します
+  private _swipeStart: Touch | null = null;
+
   constructor(private mangaService: MangaService) {
     this.searchSubject.pipe(
       debounceTime(300),
@@ -185,8 +188,6 @@ export class MangaViewerComponent implements OnInit {
       }
     }
 
-    this._swipeStart = null;
+    this._swipeStart = null; // スワイプの完了後にリセット
   }
-
-  private _swipeStart: Touch | null = null;
 }

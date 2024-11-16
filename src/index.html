@@ -5,6 +5,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <base href="/">
+    
+    <!-- Content Security Policy を追加 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://128.199.73.21:3000; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+
     <style>
       body {
         margin: 0;
