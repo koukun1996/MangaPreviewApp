@@ -48,8 +48,8 @@ if (process.env.NODE_ENV === 'test') {
 // サーバーの起動を条件付きにする
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, '::', () => {
-    console.log(`Server is running on port ${PORT}`);
+  app.listen(PORT, '127.0.0.1', () => {
+    console.log(`Server is running on http://127.0.0.1:${PORT}`);
   });
 }
 
