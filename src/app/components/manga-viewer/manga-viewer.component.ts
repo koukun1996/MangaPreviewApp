@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MangaService } from '../../services/manga.service';
@@ -23,9 +23,13 @@ export class MangaViewerComponent implements OnInit {
   isMenuVisible = false;
   currentImageIndex = 0;
   isImageViewerVisible = false;
+  isAdult = false;
 
   // クラスのプロパティとして_swipeStartを宣言します
   private _swipeStart: Touch | null = null;
+
+  private touchStartX = 0;
+  private touchEndX = 0;
 
   constructor(private mangaService: MangaService) {
     this.searchSubject.pipe(
@@ -37,6 +41,12 @@ export class MangaViewerComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.isAdult = confirm(`あなたは18歳以上ですか？
+※開発者が今までついた嘘の第一位はこちらになります。`);
+    if (!this.isAdult) {
+      alert('ご利用いただけません。');
+      window.location.href = 'https://www.google.com';
+    }
     this.loadManga();
   }
 
@@ -189,5 +199,32 @@ export class MangaViewerComponent implements OnInit {
     }
 
     this._swipeStart = null; // スワイプの完了後にリセット
+  }
+
+  // タッチ開始時の処理
+  onTouchStart(event: TouchEvent) {
+    this.touchStartX = event.changedTouches[0].screenX;
+  }
+
+  // タッチ終了時の処理
+  onTouchEnd(event: TouchEvent) {
+    this.touchEndX = event.changedTouches[0].screenX;
+    this.handleSwipeGesture();
+  }
+
+  // スワイプの方向を判定
+  handleSwipeGesture() {
+    const deltaX = this.touchEndX - this.touchStartX;
+    const threshold = 50; // スワイプと判定する閾値
+
+    if (Math.abs(deltaX) > threshold) {
+      if (deltaX < 0) {
+        // 左スワイプ
+        this.nextManga();
+      } else {
+        // 右スワイプ
+        this.previousManga();
+      }
+    }
   }
 }

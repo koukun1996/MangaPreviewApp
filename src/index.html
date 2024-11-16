@@ -19,5 +19,12 @@
   </head>
   <body>
     <app-root>Loading...</app-root>
+    <div
+      class="manga-viewer"
+      (touchstart)="onTouchStart($event)"
+      (touchend)="onTouchEnd($event)"
+    >
+      <!-- 漫画表示のコンテンツ -->
+    </div>
   </body>
 </html>
