@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { mangaRouter } = require('./routes/mangaRoutes');
 
@@ -17,14 +16,6 @@ const limiter = rateLimit({
   max: 100, // 各IPからの最大リクエスト数
 });
 app.use(limiter);
-
-// セキュリティヘッダーの設定
-// helmetの設定を詳細に行う
-app.use(
-  helmet({
-    contentSecurityPolicy: false, // CSPヘッダーの設定を無効化
-  })
-);
 
 // CORSの設定
 app.use(cors());
