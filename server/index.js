@@ -7,7 +7,33 @@ const { mangaRouter } = require('./routes/mangaRoutes');
 
 const app = express();
 
-app.use(helmet());
+if (process.env.NODE_ENV === 'development') {
+  // 開発環境（ローカル環境）の場合
+  app.use(
+    helmet.contentSecurityPolicy({
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "script-src-attr": ["'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "connect-src": ["'self'", "http://localhost:3000"], // 開発環境でのAPI呼び出しを許可
+      },
+    })
+  );
+} else {
+  // 本番環境の場合
+  app.use(
+    helmet.contentSecurityPolicy({
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'"],
+        "connect-src": ["'self'", "https://eromanga-tachiyomi-shi.net"], // 本番環境でのAPI呼び出しを許可
+      },
+    })
+  );
+}
+
 app.use(cors());
 app.use(express.json());
 
