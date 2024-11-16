@@ -19,7 +19,12 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // セキュリティヘッダーの設定
-app.use(helmet());
+// helmetの設定を詳細に行う
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // CSPヘッダーの設定を無効化
+  })
+);
 
 // CORSの設定
 app.use(cors());
