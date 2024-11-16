@@ -3,39 +3,25 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit'); // 追加: レートリミッターの導入
 const { mangaRouter } = require('./routes/mangaRoutes');
 
 const app = express();
 
-if (process.env.NODE_ENV === 'development') {
-  // 開発環境（ローカル環境）の場合
-  app.use(
-    helmet.contentSecurityPolicy({
-      directives: {
-        "default-src": ["'self'"],
-        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
-        "connect-src": ["'self'", "http://localhost:3000"], // 開発環境でのAPI呼び出しを許可
-        "script-src-attr": ["'self'", "'unsafe-inline'"],
-      },
-    })
-  );
-} else {
-  // 本番環境の場合
-  app.use(
-    helmet.contentSecurityPolicy({
-      directives: {
-        "default-src": ["'self'"],
-        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
-        "connect-src": ["'self'", "https://eromanga-tachiyomi-shi.net"], // 本番環境でのAPI呼び出しを許可
-        "script-src-attr": ["'self'", "'unsafe-inline'"],
-      },
-    })
-  );
-}
+// レートリミッターの設定（セキュリティ強化のため）
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15分間
+  max: 100, // 各IPからの最大リクエスト数
+});
+app.use(limiter);
 
+// セキュリティヘッダーの設定
+app.use(helmet());
+
+// CORSの設定
 app.use(cors());
+
+// リクエストのパース
 app.use(express.json());
 
 // 静的ファイルのパス設定
