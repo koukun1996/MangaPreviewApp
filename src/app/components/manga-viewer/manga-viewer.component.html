@@ -65,11 +65,13 @@
   </div>
   
   <div *ngIf="!isLoading && currentManga" class="manga-content">
-    <div class="preview-container" (click)="showImageViewer()">
+    <div class="preview-container">
       <img 
         [src]="currentManga.imageUrl" 
         [alt]="currentManga.title"
         class="preview-image"
+        (touchstart)="onTouchStart($event)"
+        (touchend)="onTouchEnd($event)"
       >
     </div>
     
@@ -99,7 +101,7 @@
   </div>
 
   <!-- Image Viewer Overlay -->
-  <div *ngIf="isImageViewerVisible" class="image-viewer-overlay" (click)="hideImageViewer()">
+  <div *ngIf="isImageViewerVisible" class="image-viewer-overlay">
     <div class="image-viewer-content" (click)="$event.stopPropagation()">
       <img 
         [src]="getCurrentImage()" 
@@ -116,7 +118,6 @@
           →
         </button>
       </div>
-      <button class="close-button" (click)="hideImageViewer()">×</button>
     </div>
   </div>
 </div>

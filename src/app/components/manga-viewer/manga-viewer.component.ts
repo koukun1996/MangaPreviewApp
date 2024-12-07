@@ -147,16 +147,6 @@ export class MangaViewerComponent implements OnInit {
     }
   }
 
-  showImageViewer() {
-    if (this.currentManga?.imageUrl) {
-      this.isImageViewerVisible = true;
-    }
-  }
-
-  hideImageViewer() {
-    this.isImageViewerVisible = false;
-  }
-
   nextImage() {
     if (this.currentManga?.sampleImageUrls) {
       this.currentImageIndex = (this.currentImageIndex + 1) % (this.currentManga.sampleImageUrls.length + 1);
