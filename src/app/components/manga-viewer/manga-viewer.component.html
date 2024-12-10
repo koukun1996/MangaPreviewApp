@@ -82,7 +82,7 @@
       <button (click)="goToProduct()" class="buy-button">
         商品ページへ
       </button>
-      <button (click)="goToTachiyomi()" class="tachiyomi-button">
+      <button (click)="goToTachiyomi()" [disabled]="!currentManga.tachiyomiUrl" class="tachiyomi-button">
         立読ページへ
       </button>
       <button (click)="nextManga()" class="nav-button" [disabled]="currentIndex >= mangaList.length - 1">
