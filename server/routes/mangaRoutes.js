@@ -4,25 +4,23 @@ const { query, validationResult } = require('express-validator'); // express-val
 
 const router = express.Router();
 
-router.get('/search', [
-  // バリデーションルールを変更
-  query('keyword').optional() // keywordを任意に
-], async (req, res, next) => {
-  // バリデーション結果をチェック
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    // エラーがある場合、400ステータスコードとエラーメッセージを返す
-    return res.status(400).json({ errors: errors.array() });
-  }
-
+router.get('/search', async (req, res) => {
   try {
-    const { keyword = '' } = req.query; // keywordが空の場合には空文字列を使用
-    console.log(`Received request with keyword: ${keyword}`); // デバッグ用ログ
-    const mangaList = await fetchMangaList(keyword); // fetchMangaList関数を呼び出し
+    let { keyword = '', offset = '1', direction } = req.query;
+    let offsetNum = parseInt(offset, 10) || 1;
+    const hits = 100;
+    if (direction === 'next') {
+      offsetNum += hits;
+    } else if (direction === 'prev') {
+      offsetNum = Math.max(1, offsetNum - hits);
+    }
+    console.log(`Received request: keyword=${keyword}, offset=${offsetNum}, direction=${direction}`);
+    
+    const mangaList = await fetchMangaList(keyword, offsetNum.toString());
     res.json(mangaList);
   } catch (error) {
-    console.error('FANZA APIから漫画を取得中にエラーが発生しました:', error.message);
-    res.status(500).json({ error: '漫画データの取得に失敗しました' });
+    console.error('Error fetching manga:', error.message);
+    res.status(500).json({ error: 'Failed to fetch manga data' });
   }
 });
 

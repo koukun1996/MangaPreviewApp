@@ -7,7 +7,7 @@
       <div class="header-controls">
         <div class="search-controls">
           <div class="search-container" [class.visible]="isSearchVisible">
-            <input 
+            <input
               type="text" 
               [ngModel]="searchTerm"
               (input)="onSearchInput($event)"
@@ -74,18 +74,20 @@
         (touchend)="onTouchEnd($event)"
       >
     </div>
-    
     <div class="controls">
-      <button (click)="previousManga()" class="nav-button" [disabled]="currentIndex === 0">
+      <!-- 前へボタン: 先頭かつ offset が 1 の場合のみ無効にする -->
+      <button (click)="previousManga()" class="nav-button" 
+              [disabled]="isLoading || (currentIndex === 0 && currentOffset === 1)">
         前へ
       </button>
       <button (click)="goToProduct()" class="buy-button">
         商品ページへ
       </button>
-      <button (click)="goToTachiyomi()" [disabled]="!currentManga.tachiyomiUrl" class="tachiyomi-button">
+      <button (click)="goToTachiyomi()" [disabled]="!currentManga?.tachiyomiUrl" class="tachiyomi-button">
         立読ページへ
       </button>
-      <button (click)="nextManga()" class="nav-button" [disabled]="currentIndex >= mangaList.length - 1">
+      <!-- 次へボタン: isLoading 時のみ無効にする -->
+      <button (click)="nextManga()" class="nav-button" [disabled]="isLoading">
         次へ
       </button>
     </div>

@@ -28,8 +28,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// 静的ファイルのパス設定
-const staticPath = path.join(__dirname, 'public/browser');
+// Angular の静的ファイルのパスを修正
+const staticPath = path.join(__dirname, '../dist/MangaPreviewApp/browser');
 app.use(express.static(staticPath));
 
 // APIエンドポイントの設定
@@ -50,7 +50,7 @@ if (process.env.NODE_ENV === 'test') {
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Server is running on http://127.0.0.1:${PORT}`);
+    console.log(`Server is running on http://localhost:${PORT}`);
   });
 }
 

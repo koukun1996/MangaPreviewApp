@@ -5,24 +5,30 @@ export interface Manga {
   contentId: string;
   sampleImageUrls: string[];
   tachiyomiUrl?: string;
+  offset?: number;
+}
+
+// API の各アイテムの型定義
+export interface ApiResponseItem {
+  title: string;
+  affiliateURL: string;
+  content_id: string;
+  sampleImageURLs: string[];
+  imageURL: {
+    list: string;
+    small: string;
+    large: string;
+  };
+  // tachiyomi が存在しない可能性があるため、オプショナルにします
+  tachiyomi?: {
+    URL?: string;
+    affiliateURL?: string;
+  };
 }
 
 export interface ApiResponse {
   result: {
-    items: [{
-      title: string;
-      affiliateURL: string;
-      content_id: string;
-      imageURL: {
-        list: string;
-        small: string;
-        large: string;
-      };
-      tachiyomi: {
-        URL: string;
-        affiliateURL: string;
-      };
-    }];
+    items: ApiResponseItem[];
     status: number;
     total_count: number;
     first_position: number;
