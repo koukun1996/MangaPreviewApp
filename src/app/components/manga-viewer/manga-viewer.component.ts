@@ -42,8 +42,7 @@ export class MangaViewerComponent implements OnInit {
 
   ngOnInit() {
     // 成人確認などの既存処理
-    this.isAdult = confirm(`あなたは18歳以上ですか？
-  ※開発者が今までついた嘘の第一位はこちらになります。`);
+    this.isAdult = confirm('あなたは18歳以上ですか？');
     if (!this.isAdult) {
       alert("ご利用いただけません。");
       window.location.href = "https://www.google.com";
