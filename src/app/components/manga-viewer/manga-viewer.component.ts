@@ -4,13 +4,15 @@ import { FormsModule } from "@angular/forms";
 import { MangaService } from "../../services/manga.service";
 import { Manga } from "../../models/manga.interface";
 import { debounceTime, distinctUntilChanged, Subject } from "rxjs";
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { AdultConfirmationDialogComponent } from "../AdultConfirmationDialogComponent/adult-confirmation-dialog.component";
 
 @Component({
   selector: "app-manga-viewer",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatDialogModule],
   templateUrl: "./manga-viewer.component.html",
-  styleUrls: ["./manga-viewer.component.scss"],
+  styleUrls: ["./manga-viewer.component.scss", "../../../../src/custom-theme.scss"],
 })
 export class MangaViewerComponent implements OnInit {
   currentManga: Manga | null = null;
@@ -32,7 +34,7 @@ export class MangaViewerComponent implements OnInit {
   private touchStartX = 0;
   private touchEndX = 0;
 
-  constructor(private mangaService: MangaService) {
+  constructor(private mangaService: MangaService, private dialog: MatDialog) {
     this.searchSubject
       .pipe(debounceTime(300), distinctUntilChanged())
       .subscribe((term) => {
@@ -40,23 +42,30 @@ export class MangaViewerComponent implements OnInit {
       });
   }
 
-  ngOnInit() {
-    // 成人確認などの既存処理
-    this.isAdult = confirm('あなたは18歳以上ですか？');
-    if (!this.isAdult) {
-      alert("ご利用いただけません。");
-      window.location.href = "https://www.google.com";
-      return;
-    }
+  ngOnInit(): void {
+    // 成人確認ダイアログを開く
+    const dialogRef = this.dialog.open(AdultConfirmationDialogComponent, {
+      width: '300px',
+      data: { message: 'あなたは18歳以上ですか？' },
+      panelClass: 'custom-dialog-container'
+    });
   
-    const searchParams = new URLSearchParams(window.location.search);
-    const keyword = searchParams.get('keyword') || "";
-    this.searchTerm = keyword;
+    dialogRef.afterClosed().subscribe(result => {
+      if (!result) {
+        window.location.href = 'https://www.google.com';
+        return;
+      }
   
-    // keyword がある場合はそのキーワードで読み込み、なければ通常の読み込みを行う
-    this.loadManga(keyword);
+      // 成人確認が取れた場合、URL のクエリパラメータから keyword を取得して漫画を読み込み
+      const searchParams = new URLSearchParams(window.location.search);
+      const keyword = searchParams.get("keyword") || "";
+      this.searchTerm = keyword;
+  
+      // keyword がある場合はそのキーワードで読み込み、なければ通常の読み込みを行う
+      this.loadManga(keyword);
+    });
   }
-  
+
   toggleMenu() {
     this.isMenuVisible = !this.isMenuVisible;
     document.body.style.overflow = this.isMenuVisible ? "hidden" : "";
@@ -93,7 +102,8 @@ export class MangaViewerComponent implements OnInit {
           this.currentOffset = mangaArray[0].offset;
         }
         this.currentIndex = 0;
-        this.currentManga = this.mangaList.length > 0 ? this.mangaList[0] : null;
+        this.currentManga =
+          this.mangaList.length > 0 ? this.mangaList[0] : null;
         this.currentImageIndex = 0;
         this.isLoading = false;
       },
@@ -114,7 +124,8 @@ export class MangaViewerComponent implements OnInit {
           this.currentOffset = mangaArray[0].offset;
         }
         this.currentIndex = 0;
-        this.currentManga = this.mangaList.length > 0 ? this.mangaList[0] : null;
+        this.currentManga =
+          this.mangaList.length > 0 ? this.mangaList[0] : null;
         this.currentImageIndex = 0;
         this.isLoading = false;
       },
@@ -160,7 +171,8 @@ export class MangaViewerComponent implements OnInit {
             this.currentOffset = mangaArray[0].offset;
           }
           this.currentIndex = 0;
-          this.currentManga = this.mangaList.length > 0 ? this.mangaList[0] : null;
+          this.currentManga =
+            this.mangaList.length > 0 ? this.mangaList[0] : null;
           this.currentImageIndex = 0;
           this.isLoading = false;
         },
@@ -182,8 +194,12 @@ export class MangaViewerComponent implements OnInit {
           if (mangaArray.length > 0 && mangaArray[0].offset) {
             this.currentOffset = mangaArray[0].offset;
           }
-          this.currentIndex = this.mangaList.length > 0 ? this.mangaList.length - 1 : 0;
-          this.currentManga = this.mangaList.length > 0 ? this.mangaList[this.currentIndex] : null;
+          this.currentIndex =
+            this.mangaList.length > 0 ? this.mangaList.length - 1 : 0;
+          this.currentManga =
+            this.mangaList.length > 0
+              ? this.mangaList[this.currentIndex]
+              : null;
           this.currentImageIndex = 0;
           this.isLoading = false;
         },
@@ -209,7 +225,8 @@ export class MangaViewerComponent implements OnInit {
   nextImage() {
     if (this.currentManga?.sampleImageUrls) {
       this.currentImageIndex =
-        (this.currentImageIndex + 1) % (this.currentManga.sampleImageUrls.length + 1);
+        (this.currentImageIndex + 1) %
+        (this.currentManga.sampleImageUrls.length + 1);
     }
   }
 
