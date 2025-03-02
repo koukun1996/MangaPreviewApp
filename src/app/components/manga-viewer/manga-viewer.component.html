@@ -1,4 +1,18 @@
 <div class="manga-viewer">
+  <!-- カスタム年齢確認ダイアログ -->
+  <div *ngIf="showCustomDialog" class="custom-dialog-overlay">
+    <div class="custom-dialog">
+      <h2 class="custom-dialog-title">年齢確認</h2>
+      <div class="custom-dialog-content">
+        <p>あなたは18歳以上ですか？</p>
+      </div>
+      <div class="custom-dialog-actions">
+        <button class="btn-primary" (click)="onCustomConfirm()">はい</button>
+        <button class="btn-secondary" (click)="onCustomCancel()">いいえ</button>
+      </div>
+    </div>
+  </div>
+
   <div class="header">
     <div class="header-content">
       <div class="manga-title">
@@ -64,7 +78,7 @@
     えっちな漫画をロード中...
   </div>
   
-  <div *ngIf="!isLoading && currentManga" class="manga-content">
+  <div *ngIf="!isLoading && currentManga && isAdult" class="manga-content">
     <div class="preview-container">
       <img 
         [src]="currentManga.imageUrl" 
@@ -98,8 +112,11 @@
     </div>
   </div>
 
-  <div *ngIf="!isLoading && !currentManga && mangaList.length === 0" class="no-results">
-    検索結果が見つかりませんでした
+  <!-- 検索結果なしのメッセージ（年齢確認済みの場合のみ表示） -->
+  <div *ngIf="!isLoading && !currentManga && isAdult" class="no-results">
+    <p>検索結果が見つかりませんでした</p>
+    <p>mangaList.length: {{mangaList.length}}</p>
+    <p>currentManga: {{currentManga | json}}</p>
   </div>
 
   <!-- Image Viewer Overlay -->

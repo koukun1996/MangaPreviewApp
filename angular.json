@@ -5,7 +5,11 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "demo": {
+    "MangaPreviewApp": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
@@ -13,14 +17,11 @@
             "outputPath": "dist/MangaPreviewApp/browser",
             "index": "src/index.html",
             "main": "src/main.ts",
+            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": ["src/favicon.ico", "src/assets"],
-            "styles": [
-              "src/custom-theme.scss",
-              "src/global_styles.css"
-            ],
-            "scripts": [],
-            "baseHref": "/"
+            "styles": ["src/styles.css"],
+            "scripts": []
           },
           "configurations": {
             "production": {
@@ -49,24 +50,72 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "browserTarget": "demo:build:production"
+              "browserTarget": "MangaPreviewApp:build:production"
             },
             "development": {
-              "browserTarget": "demo:build:development"
+              "browserTarget": "MangaPreviewApp:build:development"
             }
           },
           "defaultConfiguration": "development"
+        },
+        "server": {
+          "builder": "@angular-devkit/build-angular:server",
+          "options": {
+            "outputPath": "dist/MangaPreviewApp/server",
+            "main": "server.ts",
+            "tsConfig": "tsconfig.server.json"
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "media"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true,
+              "extractLicenses": false
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve-ssr": {
+          "builder": "@nguniversal/builders:ssr-dev-server",
+          "configurations": {
+            "development": {
+              "browserTarget": "MangaPreviewApp:build:development",
+              "serverTarget": "MangaPreviewApp:server:development"
+            },
+            "production": {
+              "browserTarget": "MangaPreviewApp:build:production",
+              "serverTarget": "MangaPreviewApp:server:production"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "prerender": {
+          "builder": "@nguniversal/builders:prerender",
+          "options": {
+            "routes": [
+              "/"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "browserTarget": "MangaPreviewApp:build:production",
+              "serverTarget": "MangaPreviewApp:server:production"
+            },
+            "development": {
+              "browserTarget": "MangaPreviewApp:build:development",
+              "serverTarget": "MangaPreviewApp:server:development"
+            }
+          },
+          "defaultConfiguration": "production"
         }
       },
-      "prefix": "app",
-      "projectType": "application",
-      "root": "",
       "schematics": {
         "@schematics/angular:component": {
           "style": "scss"
         }
-      },
-      "sourceRoot": "src"
+      }
     }
   },
   "version": 1

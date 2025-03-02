@@ -1,9 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, tap } from 'rxjs/operators';
 import { Manga } from '../models/manga.interface';
 import { environment } from '../../environments/environment';
+import { makeStateKey, TransferState } from '@angular/platform-browser';
+
+const MANGA_KEY = makeStateKey<Manga[]>('manga-list');
 
 @Injectable({
   providedIn: 'root'
@@ -11,7 +14,10 @@ import { environment } from '../../environments/environment';
 export class MangaService {
   private readonly API_BASE_URL = environment.apiUrl;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private transferState: TransferState
+  ) {}
 
   /**
    * 漫画検索APIを呼び出します。
@@ -33,13 +39,36 @@ export class MangaService {
       params = params.set('direction', direction);
     }
 
-    return this.http.get<Manga[]>(`${this.API_BASE_URL}/api/manga/search`, { params }).pipe(
+    console.log('[MangaService] API呼び出しパラメータ:', params.toString());
+
+    // Check if we have data in TransferState
+    const existingData = this.transferState.get(MANGA_KEY, null);
+    if (existingData) {
+      // If we have data in TransferState, use it and remove it
+      console.log('[MangaService] TransferStateからデータを読み込み:', existingData);
+      this.transferState.remove(MANGA_KEY);
+      return of(existingData);
+    }
+
+    console.log('[MangaService] APIリクエスト:', `${this.API_BASE_URL}/api/manga`, params.toString());
+    
+    return this.http.get<Manga[]>(`${this.API_BASE_URL}/api/manga`, { params }).pipe(
+      tap(data => {
+        console.log('[MangaService] APIレスポンス受信:', data);
+        // Store the data in TransferState if we're on the server
+        if (typeof window === 'undefined') {
+          console.log('[MangaService] データをTransferStateに格納');
+          this.transferState.set(MANGA_KEY, data);
+        }
+      }),
       map((res: Manga[]) => {
         // サーバーから直接 Manga[] の形式で返ってくることを前提とする
         if (!res || !Array.isArray(res)) {
+          console.warn('[MangaService] レスポンスが配列ではありません:', res);
           return [];
         }
         // サーバーのレスポンスのキー名に合わせてマッピングする
+        console.log('[MangaService] レスポンスを変換:', res);
         return res.map((item: any) => {
           return {
             title: item.title,
@@ -52,8 +81,11 @@ export class MangaService {
           } as Manga;
         });
       }),
+      tap(data => {
+        console.log('[MangaService] 変換後のデータ:', data);
+      }),
       catchError(error => {
-        console.error('Error fetching manga:', error);
+        console.error('[MangaService] エラー発生:', error);
         return of([]);
       })
     );
