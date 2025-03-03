@@ -10,7 +10,9 @@
     "test": "ng test",
     "dev:ssr": "ng run MangaPreviewApp:serve-ssr",
     "serve:ssr": "node dist/MangaPreviewApp/server/main.js",
-    "build:ssr": "ng build && ng run MangaPreviewApp:server && npm run copy-server",
+    "build:ssr": "npm run build:ssr:dev",
+    "build:ssr:dev": "ng build && ng run MangaPreviewApp:server && npm run copy-server",
+    "build:ssr:prod": "ng build --configuration production && ng run MangaPreviewApp:server:production && npm run copy-server",
     "prerender": "ng run MangaPreviewApp:prerender",
     "copy-server": "node -e \"require('fs-extra').copySync('server', 'dist/MangaPreviewApp/server')\""
   },
