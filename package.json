@@ -14,7 +14,13 @@
     "build:ssr:dev": "ng build && ng run MangaPreviewApp:server && npm run copy-server",
     "build:ssr:prod": "ng build --configuration production && ng run MangaPreviewApp:server:production && npm run copy-server",
     "prerender": "ng run MangaPreviewApp:prerender",
-    "copy-server": "node -e \"require('fs-extra').copySync('server', 'dist/MangaPreviewApp/server')\""
+    "copy-server": "node -e \"require('fs-extra').copySync('server', 'dist/MangaPreviewApp/server')\"",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop manga-preview-ssr",
+    "pm2:restart": "pm2 restart manga-preview-ssr",
+    "pm2:delete": "pm2 delete manga-preview-ssr",
+    "pm2:list": "pm2 list",
+    "pm2:logs": "pm2 logs manga-preview-ssr"
   },
   "dependencies": {
     "@angular/animations": "^16.0.0 || ^17.0.0",
