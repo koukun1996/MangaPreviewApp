@@ -1,0 +1,84 @@
+@use '@angular/material' as mat;
+
+@include mat.core(); // Angular Material のコアスタイルを読み込み
+
+// 各パレットの定義（必要に応じて色を調整）
+$primary: mat.define-palette(mat.$indigo-palette);
+$accent:  mat.define-palette(mat.$pink-palette, A200, A100, A400);
+$warn:    mat.define-palette(mat.$red-palette);
+
+// ダークテーマの作成
+$dark-theme: mat.define-dark-theme((
+  color: (
+    primary: $primary,
+    accent: $accent,
+    warn: $warn,
+  ),
+  background: (
+    background: #121212, // ページ全体の背景色
+    card: #1e1e1e,       // カードやコンテナの背景色
+    status-bar: #000000, // ステータスバーやヘッダーの背景色
+  )
+));
+
+// Angular Material の各コンポーネントにテーマを適用
+@include mat.all-component-themes($dark-theme);
+
+// ---------------------------
+// Overlay 用（panelClassで指定された custom-dialog-container ）のスタイル
+// ---------------------------
+.custom-dialog-container {
+  // Overlay側の要素。中の mat-dialog-container に対してスタイルを適用
+  mat-dialog-container {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+  }
+}
+
+// ---------------------------
+// コンポーネント内部のスタイル（app-adult-confirmation-dialog 内）
+// ---------------------------
+app-adult-confirmation-dialog {
+  .custom-dialog-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #444444;
+    padding: 8px 20px; // 上下8px、左右20pxのパディング
+  }
+  
+  .custom-dialog-content {
+    margin: 16px 0;
+    font-size: 1rem;
+    padding: 0 20px; // 左右20pxのパディング
+    
+    p {
+      margin-top: -4px; // テキストを少し上にずらす
+    }
+  }
+  
+  .custom-dialog-actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    
+    /* ボタンのカスタムスタイル */
+    button[mat-button] {
+      background-color: #545454;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      margin-bottom: 8px; // ボタン下部に8pxの余白を追加
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      
+      &:hover {
+        background-color: #757575;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+    }
+  }
+}
