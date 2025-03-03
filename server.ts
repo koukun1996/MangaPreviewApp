@@ -106,12 +106,12 @@ function createDummyManga(offset: number) {
 }
 
 function run(): void {
-  const port = process.env['PORT'] || 3001;
+  const PORT = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 4000;
 
   // サーバー起動
   const server = app();
-  server.listen(port, () => {
-    console.log(`サーバー起動: http://localhost:${port}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Node Express server listening on http://0.0.0.0:${PORT}`);
   });
 }
 
