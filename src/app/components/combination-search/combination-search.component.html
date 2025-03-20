@@ -1,0 +1,106 @@
+<div class="combination-search-container">
+  <h1>組み合わせで漫画を探す</h1>
+
+  <!-- ローディングインジケーター -->
+  <div class="loading-spinner" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>データを読み込み中...</p>
+  </div>
+
+  <!-- 人気の組み合わせ -->
+  <div class="popular-combinations" *ngIf="!isLoading && popularCombinations.length > 0">
+    <h2>人気の組み合わせ</h2>
+    <div class="combination-tags">
+      <div 
+        *ngFor="let combo of popularCombinations" 
+        class="combination-tag" 
+        [class.selected]="selectedCombination === combo.combination"
+        (click)="selectCombination(combo.combination)"
+      >
+        <span *ngFor="let tag of combo.combination" class="tag">{{ tag }}</span>
+        <span class="count">({{ combo.count }})</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- すべての組み合わせ -->
+  <div class="all-combinations" *ngIf="!isLoading && allCombinations.length > 0">
+    <h2>すべての組み合わせ</h2>
+    <input 
+      type="text" 
+      placeholder="組み合わせを検索..." 
+      class="search-input"
+      [(ngModel)]="searchTerm"
+      (input)="filterCombinations(searchTerm)"
+    >
+    <div class="combination-tags">
+      <div 
+        *ngFor="let combo of filteredCombinations" 
+        class="combination-tag" 
+        [class.selected]="isSelectedCombination(combo)"
+        (click)="selectCombination(combo)"
+      >
+        <span *ngFor="let tag of combo" class="tag">{{ tag }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 検索結果 -->
+  <div class="search-results" *ngIf="searchResults.length > 0">
+    <h2>検索結果 ({{ searchResults.length }}件)</h2>
+    
+    <div class="manga-grid">
+      <div *ngFor="let manga of paginatedResults" class="manga-card">
+        <div class="manga-thumbnail">
+          <img [src]="manga.thumbnailUrl" [alt]="manga.title" loading="lazy">
+        </div>
+        <div class="manga-info">
+          <h3>{{ manga.title }}</h3>
+          <p class="author">{{ manga.author }}</p>
+          <p class="price">{{ manga.price }}円</p>
+          <div class="manga-tags">
+            <span *ngFor="let tag of manga.tags" class="tag">{{ tag }}</span>
+          </div>
+          <div class="manga-actions">
+            <a [href]="manga.affiliateUrl" target="_blank" class="btn btn-primary" *ngIf="manga.affiliateUrl">商品ページへ</a>
+            <a [href]="manga.tachiyomiUrl" target="_blank" class="btn btn-secondary" *ngIf="manga.tachiyomiUrl">立ち読みページへ</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ページネーション -->
+    <div class="pagination" *ngIf="totalPages > 1">
+      <button 
+        class="page-btn" 
+        [disabled]="currentPage === 1" 
+        (click)="changePage(currentPage - 1)"
+      >
+        前へ
+      </button>
+      
+      <button 
+        *ngFor="let page of pageNumbers" 
+        class="page-btn" 
+        [class.active]="page === currentPage"
+        (click)="changePage(page)"
+      >
+        {{ page }}
+      </button>
+      
+      <button 
+        class="page-btn" 
+        [disabled]="currentPage === totalPages" 
+        (click)="changePage(currentPage + 1)"
+      >
+        次へ
+      </button>
+    </div>
+  </div>
+
+  <!-- 検索結果なし -->
+  <div class="no-results" *ngIf="!isLoading && selectedCombination.length > 0 && searchResults.length === 0">
+    <p>選択した組み合わせに一致する漫画が見つかりませんでした。</p>
+    <p>別の組み合わせを選択してください。</p>
+  </div>
+</div> 

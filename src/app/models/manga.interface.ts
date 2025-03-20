@@ -1,11 +1,24 @@
 export interface Manga {
+  fanzaId: string;
   title: string;
-  imageUrl: string;
+  author: string;
+  price: number;
+  thumbnailUrl: string;
+  tags: string[];
+  genres?: Genre[];
+  description: string;
   affiliateUrl: string;
-  contentId: string;
-  sampleImageUrls: string[];
-  tachiyomiUrl?: string;
+  tachiyomiUrl: string;
+  createdAt: Date;
+  updatedAt: Date;
   offset?: number;
+  sampleImageUrls?: string[];
+}
+
+// ジャンル情報の型定義
+export interface Genre {
+  name: string;
+  id: string;
 }
 
 // API の各アイテムの型定義
@@ -19,6 +32,7 @@ export interface ApiResponseItem {
     small: string;
     large: string;
   };
+  genre?: Genre[];
   // tachiyomi が存在しない可能性があるため、オプショナルにします
   tachiyomi?: {
     URL?: string;
@@ -33,4 +47,12 @@ export interface ApiResponse {
     total_count: number;
     first_position: number;
   };
+}
+
+// MongoDB用のスキーマ
+export interface MangaDocument extends Manga {
+  _id?: string;
+  searchKeywords: string[];
+  combinations: string[][];
+  lastUpdated: Date;
 }

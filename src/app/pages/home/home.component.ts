@@ -6,6 +6,9 @@ import { MangaViewerComponent } from '../../components/manga-viewer/manga-viewer
   selector: 'app-home',
   standalone: true,
   imports: [CommonModule, MangaViewerComponent],
-  template: `<app-manga-viewer></app-manga-viewer>`
+  template: `<app-manga-viewer></app-manga-viewer>`,
+  styles: []
 })
-export class HomeComponent {} 
+export class HomeComponent {
+  // シンプル化 - 特に何も実装しない
+} 

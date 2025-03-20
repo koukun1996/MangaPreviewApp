@@ -20,7 +20,9 @@
     "pm2:restart": "pm2 restart manga-preview-ssr",
     "pm2:delete": "pm2 delete manga-preview-ssr",
     "pm2:list": "pm2 list",
-    "pm2:logs": "pm2 logs manga-preview-ssr"
+    "pm2:logs": "pm2 logs manga-preview-ssr",
+    "generate-dummy-data": "ts-node scripts/generateDummyData.ts",
+    "fetch-fanza-data": "ts-node scripts/fetchFanzaData.ts"
   },
   "dependencies": {
     "@angular/animations": "^16.0.0 || ^17.0.0",
@@ -28,7 +30,8 @@
     "@angular/forms": "^16.0.0 || ^17.0.0",
     "@angular/material": "^16.2.14",
     "@nguniversal/express-engine": "^16.2.0",
-    "axios": "^1.6.2",
+    "@types/mongodb": "^4.0.6",
+    "axios": "^1.8.2",
     "body-parser": "^1.20.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -36,10 +39,12 @@
     "express": "^4.15.2",
     "express-rate-limit": "^7.4.1",
     "express-validator": "^7.2.0",
-    "helmet": "^7.2.0"
+    "helmet": "^7.2.0",
+    "mongodb": "^6.14.2",
+    "mongoose": "^8.12.1"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^16.2.16",
+    "@angular-devkit/build-angular": "^16.2.12",
     "@angular/animations": "16.2.0",
     "@angular/cli": "16.2.0",
     "@angular/common": "16.2.0",
@@ -61,6 +66,7 @@
     "nodemon": "^3.0.2",
     "rxjs": "^7.8.1",
     "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
     "tslib": "^2.6.2",
     "typescript": "~5.1.6",
     "zone.js": "^0.13.3"

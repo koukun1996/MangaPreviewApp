@@ -1,19 +1,36 @@
 import 'zone.js/node';
 import * as dotenv from 'dotenv';
+import { APP_BASE_HREF } from '@angular/common';
+import { ngExpressEngine } from '@nguniversal/express-engine';
+import express from 'express';
+import * as bodyParser from 'body-parser';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import bootstrap from './src/main.server';
+import { environment } from './src/environments/environment';
+import { DatabaseService } from './server/services/database.service';
+import { mangaRouter } from './server/routes/manga.routes';
 
 // 環境変数を読み込む
 dotenv.config();
 
-import { APP_BASE_HREF } from '@angular/common';
-import { ngExpressEngine } from '@nguniversal/express-engine';
-import express from 'express';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import bootstrap from './src/main.server';
+// MongoDBに接続
+const MONGO_URI = process.env['MONGO_URI'] || 'mongodb://admin:your_secure_password@localhost:27017/manga_preview?authSource=admin&directConnection=true';
 
-// mangaServiceをインポート
-import { fetchMangaList } from './server/services/mangaService';
+// モデルファイルを明示的に読み込み
+// モデルを先に読み込んでおくことで、アプリケーション全体で一貫したモデルを使用できます
+try {
+  const mangaModel = require('./server/models/manga.model');
+  console.log('Mongooseモデルを読み込みました:', {
+    型: typeof mangaModel,
+    デフォルト: typeof mangaModel.default,
+    キー: Object.keys(mangaModel)
+  });
+} catch (error) {
+  console.error('Mongooseモデルの読み込みエラー:', error);
+}
 
+// The Express app is exported so that it can be used by serverless Functions.
 export function app(): express.Express {
   const server = express();
   const distFolder = join(process.cwd(), 'dist/MangaPreviewApp/browser');
@@ -21,49 +38,11 @@ export function app(): express.Express {
     ? 'index.original.html'
     : 'index';
 
-  // APIエンドポイントの定義
-  const apiHandler = async (req: express.Request, res: express.Response) => {
-    try {
-      const keyword = (req.query['keyword'] as string) || '';
-      const offset = (req.query['offset'] as string) || '1';
-      
-      try {
-        const mangaList = await fetchMangaList(keyword, offset);
-        
-        if (mangaList.length === 0 && process.env['NODE_ENV'] === 'development') {
-          // 開発環境でのみダミーデータを返す
-          return res.json([
-            createDummyManga(parseInt(offset, 10)),
-            createDummyManga(parseInt(offset, 10) + 1)
-          ]);
-        }
-        
-        return res.json(mangaList);
-      } catch (error: any) {
-        console.error('漫画データ取得エラー:', error.message);
-        return res.status(500).json({ 
-          error: '漫画データの取得に失敗しました'
-        });
-      }
-    } catch (error: any) {
-      console.error('APIハンドラーエラー:', error.message);
-      return res.status(500).json({ error: 'サーバーエラーが発生しました' });
-    }
-  };
+  // リクエストボディのパース設定
+  server.use(bodyParser.json({ limit: '10mb' }));
+  server.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-  // API エンドポイントを登録
-  server.get('/api/manga', apiHandler);
-  server.get('/manga', apiHandler);
-
-  // CORS設定
-  server.use((req, res, next) => {
-    const allowedOrigin = process.env['ALLOWED_ORIGIN'] || '*';
-    res.header('Access-Control-Allow-Origin', allowedOrigin);
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-  });
-
-  // Universal engine設定
+  // Our Universal express-engine
   server.engine('html', ngExpressEngine({
     bootstrap
   }));
@@ -71,56 +50,78 @@ export function app(): express.Express {
   server.set('view engine', 'html');
   server.set('views', distFolder);
 
-  // 静的ファイル提供
+  // CORS設定
+  server.use((req, res, next) => {
+    const allowedOrigin = process.env['ALLOWED_ORIGIN'] || '*';
+    res.header('Access-Control-Allow-Origin', allowedOrigin);
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    // プリフライトリクエストに対応
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    return next();
+  });
+
+  // APIルートの設定
+  server.use('/api/manga', mangaRouter);
+
+  // Serve static files from /browser
   server.get('*.*', express.static(distFolder, {
     maxAge: '1y'
   }));
 
-  // Angular Universalでレンダリング
+  // All regular routes use the Universal engine
   server.get('*', (req, res) => {
-    res.render(indexHtml, {
+    res.render(indexHtml, { 
       req,
-      providers: [{ provide: APP_BASE_HREF, useValue: req.baseUrl }]
+      providers: [
+        { provide: APP_BASE_HREF, useValue: req.baseUrl }
+      ]
     });
   });
 
   return server;
 }
 
-/**
- * 開発環境用のダミー漫画データを生成する
- */
-function createDummyManga(offset: number) {
-  return {
-    title: `ダミー漫画 ${offset}`,
-    imageUrl: `https://picsum.photos/200/300?random=${offset}`,
-    affiliateUrl: 'https://example.com',
-    contentId: `dummy-content-${offset}`,
-    sampleImageUrls: [
-      `https://picsum.photos/200/300?random=${offset}`,
-      `https://picsum.photos/200/300?random=${offset+100}`
-    ],
-    tachiyomiUrl: 'https://example.com/tachiyomi',
-    offset
-  };
+async function run(): Promise<void> {
+  const port = process.env['PORT'] || 4000;
+
+  try {
+    // データベースに接続
+    await DatabaseService.getInstance().connect(MONGO_URI);
+    console.log('MongoDB接続成功');
+    
+    // Start up the Node server
+    const server = app();
+    server.listen(port, () => {
+      console.log(`Node Express server listening on http://localhost:${port}`);
+    });
+    
+    // エラーハンドリング
+    process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+      console.error('Unhandled Rejection:', reason);
+    });
+    
+    process.on('uncaughtException', (error: Error) => {
+      console.error('Uncaught Exception:', error);
+    });
+    
+  } catch (error) {
+    console.error('サーバー起動エラー:', error);
+    process.exit(1);
+  }
 }
 
-function run(): void {
-  const PORT = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 4000;
-
-  // サーバー起動
-  const server = app();
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Node Express server listening on http://0.0.0.0:${PORT}`);
-  });
-}
-
-// Webpackによる置換処理
+// Webpack will replace 'require' with '__webpack_require__'
+// '__non_webpack_require__' is a proxy to Node 'require'
+// The below code is to ensure that the server is run only when not requiring the bundle.
 declare const __non_webpack_require__: NodeRequire;
 const mainModule = __non_webpack_require__.main;
 const moduleFilename = mainModule && mainModule.filename || '';
 if (moduleFilename === __filename || moduleFilename.includes('iisnode')) {
-  run();
+  run().catch(err => {
+    console.error('サーバー実行エラー:', err);
+    process.exit(1);
+  });
 }
-
-export default bootstrap;
