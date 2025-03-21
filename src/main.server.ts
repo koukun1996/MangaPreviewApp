@@ -1,7 +1,14 @@
-import { bootstrapApplication } from '@angular/platform-browser';
-import { AppComponent } from '../src/app/app.component';
-import { config } from './app/app.config.server';
+import { AppServerModule } from './app/app.server.module';
+import { enableProdMode, ApplicationRef } from '@angular/core';
+import { platformServer } from '@angular/platform-server';
 
-const bootstrap = () => bootstrapApplication(AppComponent, config);
+// 開発環境モードを無効化
+enableProdMode();
 
-export default bootstrap;
+// 単純化したブートストラップ関数
+export function bootstrap(): Promise<ApplicationRef> {
+  // platformServerを使用してAppServerModuleをブートストラップ
+  return platformServer()
+    .bootstrapModule(AppServerModule)
+    .then(moduleRef => moduleRef.injector.get(ApplicationRef));
+}

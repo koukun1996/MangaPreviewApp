@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes, ExtraOptions } from '@angular/router';
 import { MangaViewerComponent } from './components/manga-viewer/manga-viewer.component';
 import { HomeComponent } from './pages/home/home.component';
+import { MangaDetailComponent } from './pages/manga-detail/manga-detail.component';
 
 export const routes: Routes = [
   { 
@@ -15,7 +16,7 @@ export const routes: Routes = [
   },
   { 
     path: 'manga/:id', 
-    component: MangaViewerComponent,
+    component: MangaDetailComponent,
     data: {
       title: 'マンガ詳細 - エロ漫画立ち読み市',
       metaTags: {

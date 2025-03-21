@@ -6,10 +6,19 @@ import express from 'express';
 import * as bodyParser from 'body-parser';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import bootstrap from './src/main.server';
 import { environment } from './src/environments/environment';
 import { DatabaseService } from './server/services/database.service';
 import { mangaRouter } from './server/routes/manga.routes';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+// AppComponentのインポートを削除
+// import { AppComponent } from './app/app.component';
+// main.server.tsからbootstrap関数をインポート
+// import { bootstrap } from './src/main.server';
+import { AppServerModule } from './src/app/app.server.module';
+
+// サイトマップルーターのインポート
+const sitemapRouter = require('./server/routes/sitemap.routes');
 
 // 環境変数を読み込む
 dotenv.config();
@@ -30,21 +39,40 @@ try {
   console.error('Mongooseモデルの読み込みエラー:', error);
 }
 
-// The Express app is exported so that it can be used by serverless Functions.
-export function app(): express.Express {
+// The Express app is defined but not exported directly
+function app(): express.Express {
   const server = express();
   const distFolder = join(process.cwd(), 'dist/MangaPreviewApp/browser');
   const indexHtml = existsSync(join(distFolder, 'index.original.html'))
     ? 'index.original.html'
     : 'index';
 
+  // 'X-Powered-By'ヘッダーを無効化
+  server.disable('x-powered-by');
+
+  // trust first proxy
+  server.set('trust proxy', 1);
+
+  // レートリミッターの設定
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15分間
+    max: 100, // 各IPからの最大リクエスト数
+  });
+  server.use(limiter);
+
   // リクエストボディのパース設定
   server.use(bodyParser.json({ limit: '10mb' }));
   server.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+  // 'Content-Security-Policy'ヘッダーを削除するミドルウェアを追加
+  server.use((req, res, next) => {
+    res.removeHeader('Content-Security-Policy');
+    next();
+  });
+
   // Our Universal express-engine
   server.engine('html', ngExpressEngine({
-    bootstrap
+    bootstrap: AppServerModule
   }));
 
   server.set('view engine', 'html');
@@ -66,6 +94,9 @@ export function app(): express.Express {
   // APIルートの設定
   server.use('/api/manga', mangaRouter);
 
+  // サイトマップルートを追加
+  server.use('/', sitemapRouter);
+
   // Serve static files from /browser
   server.get('*.*', express.static(distFolder, {
     maxAge: '1y'
@@ -84,6 +115,7 @@ export function app(): express.Express {
   return server;
 }
 
+// run関数内でappを使用
 async function run(): Promise<void> {
   const port = process.env['PORT'] || 4000;
 
@@ -125,3 +157,6 @@ if (moduleFilename === __filename || moduleFilename.includes('iisnode')) {
     process.exit(1);
   });
 }
+
+// テスト用にアプリをエクスポートする場合は、appをエクスポートしない
+// export { app }; // この行を削除

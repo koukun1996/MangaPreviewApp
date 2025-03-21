@@ -1,0 +1,94 @@
+<div class="manga-detail-container">
+  <!-- ローディングインジケータ -->
+  <div *ngIf="isLoading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>漫画情報を読み込み中...</p>
+  </div>
+
+  <!-- エラーメッセージ -->
+  <div *ngIf="error && !isLoading" class="error-container">
+    <mat-icon color="warn">error</mat-icon>
+    <p>{{ error }}</p>
+    <button mat-raised-button color="primary" (click)="goBack()">トップページに戻る</button>
+  </div>
+
+  <!-- 漫画詳細表示 -->
+  <div *ngIf="manga && !isLoading" class="manga-content">
+    <div class="back-button-container">
+      <button mat-icon-button (click)="goBack()" aria-label="戻る">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    </div>
+
+    <!-- メイン情報 -->
+    <mat-card class="manga-card">
+      <div class="manga-header">
+        <h1 class="manga-title">{{ manga.title }}</h1>
+        <p class="manga-author" (click)="navigateToAuthor(manga.author)">作者: {{ manga.author }}</p>
+      </div>
+
+      <div class="manga-main-content">
+        <div class="manga-thumbnail">
+          <img [src]="manga.thumbnailUrl" [alt]="manga.title" class="thumbnail-img">
+        </div>
+
+        <div class="manga-info">
+          <p class="manga-description" *ngIf="manga.description">{{ manga.description }}</p>
+          
+          <div class="manga-tags">
+            <h3>タグ</h3>
+            <div class="tags-container">
+              <mat-chip-set>
+                <mat-chip *ngFor="let tag of manga.tags" (click)="navigateToTag(tag)" color="primary">
+                  {{ tag }}
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+
+          <div class="manga-price" *ngIf="manga.price">
+            <h3>価格</h3>
+            <p>{{ manga.price }}円</p>
+          </div>
+
+          <div class="manga-actions">
+            <button mat-raised-button color="primary" *ngIf="manga.affiliateUrl" (click)="openPurchaseLink()">
+              <mat-icon>shopping_cart</mat-icon> 購入する
+            </button>
+            <button mat-raised-button color="accent" *ngIf="manga.tachiyomiUrl" (click)="openPreviewLink()">
+              <mat-icon>visibility</mat-icon> 立ち読みする
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- サンプル画像がある場合 -->
+      <div class="manga-samples" *ngIf="manga.sampleImageUrls && manga.sampleImageUrls.length > 0">
+        <h3>サンプル画像</h3>
+        <div class="sample-images">
+          <div *ngFor="let img of manga.sampleImageUrls" class="sample-image-container">
+            <img [src]="img" alt="サンプル画像" class="sample-img">
+          </div>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- 関連作品 -->
+    <div class="related-manga" *ngIf="relatedManga && relatedManga.length > 0">
+      <h2>関連作品</h2>
+      <div class="related-manga-grid">
+        <div *ngFor="let related of relatedManga" class="related-manga-item" (click)="loadMangaDetails(related.fanzaId)">
+          <img [src]="related.thumbnailUrl" [alt]="related.title" class="related-thumbnail">
+          <p class="related-title">{{ related.title }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 下部ナビゲーション -->
+    <div class="bottom-nav">
+      <button mat-raised-button color="primary" (click)="goBack()">
+        <mat-icon>home</mat-icon> トップページに戻る
+      </button>
+    </div>
+  </div>
+</div> 

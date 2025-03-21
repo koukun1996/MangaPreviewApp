@@ -6,6 +6,8 @@ import { Manga } from "../../models/manga.interface";
 import { debounceTime, distinctUntilChanged, Subject } from "rxjs";
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { AdultConfirmationDialogComponent } from "../AdultConfirmationDialogComponent/adult-confirmation-dialog.component";
+import { ActivatedRoute, Router } from '@angular/router';
+import { SeoService } from '../../services/seo.service';
 
 interface GenreItem {
   genre: string;
@@ -128,11 +130,18 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedGenres: string[] = []; // 複数ジャンル選択をサポート
   isGenreListVisible = false;
 
+  mangaId: string | null = null;
+  displayManga: Manga | null = null;
+  error: string | null = null;
+
   constructor(
     private mangaService: MangaService,
     public dialog: MatDialog,
     @Inject(PLATFORM_ID) private platformId: Object,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
+    private router: Router,
+    private seoService: SeoService
   ) {
     console.log('[DEBUG] MangaViewerComponent constructor called');
     /* 検索ボタン対応のため、自動検索機能を無効化
@@ -149,26 +158,32 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     console.log('[DEBUG] MangaViewerComponent ngOnInit called');
     
-    // 初期検索語の取得
-    if (isPlatformBrowser(this.platformId)) {
-      const searchParams = new URLSearchParams(window.location.search);
-      const keyword = searchParams.get("keyword") || "";
-      this.searchTerm = keyword;
-    }
+    // 初期状態ではローディング中とする
+    this.isLoading = true;
     
-    // 初期データのロード
-    this.isLoading = true; // ローディング状態にしてから読み込み開始
-    this.isImageLoading = true;
-    this.loadManga(this.searchTerm);
+    // スマホ・タブレットの判定
+    this.checkDeviceType();
+
+    // URLパラメータからIDを取得
+    this.route.params.subscribe(params => {
+      if (params['id']) {
+        this.mangaId = params['id'];
+        if (this.mangaId) {
+          this.loadMangaData(this.mangaId);
+        }
+      } else {
+        this.loadLatestManga();
+      }
+    });
+
+    // ページネーションの初期化
+    this.initPagination();
     
-    // デバイスタイプの検出
-    this.detectDeviceType();
-    
-    // ヘッダー制御の設定
-    this.setupHeaderControl();
+    // 成人確認の状態を確認
+    this.checkAdultConfirmation();
     
     // ジャンル一覧を取得
-    this.loadGenres();
+    this.fetchGenres();
   }
 
   ngAfterViewInit(): void {
@@ -732,25 +747,13 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // デバイスタイプを検出する関数
-  private detectDeviceType(): void {
+  checkDeviceType(): void {
     if (isPlatformBrowser(this.platformId)) {
-      // モバイルデバイスの判定（画面幅で判断）
+      // ブラウザ環境でのみwindowオブジェクトを使用
       this.isMobileDevice = window.innerWidth < 768;
-      
-      // リサイズ時にデバイスタイプを再検出
-      window.addEventListener('resize', () => {
-        this.isMobileDevice = window.innerWidth < 768;
-        // PC/タブレットの場合はヘッダーを常に表示
-        if (!this.isMobileDevice) {
-          this.isHeaderVisible = true;
-          this.isPermanentHeaderVisible = true;
-        }
-      });
-      
-      // 初期設定
-      if (!this.isMobileDevice) {
-        this.isPermanentHeaderVisible = true;
-      }
+    } else {
+      // サーバー環境ではデフォルト値を設定
+      this.isMobileDevice = false;
     }
   }
 
@@ -836,10 +839,9 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isLoading = true;
     this.isImageLoading = true;
     console.log('[Client] レコメンデーション取得開始');
-    
+
     // 現在の漫画からタグとジャンル、作者を抽出
     const tags = this.currentManga?.tags || [];
-    const genres: string[] = []; // ジャンルが存在する場合はここに追加
     const authors = this.currentManga?.author ? [this.currentManga.author] : [];
     
     // すでに表示した漫画を除外
@@ -850,22 +852,25 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.nextCursor = null;
     this.cursorHistory = [];
     
+    // 修正された引数を渡す
     this.mangaService.getRecommendations(
-      genres, 
-      tags, 
-      authors,
-      excludeIds
+      [], // genres - 空の配列または関連するジャンル
+      tags, // tags - 選択されたタグ
+      [], // authors - 空の配列または関連する作者
+      excludeIds, // excludeIds - 現在の漫画IDを除外
+      null, // cursor - ページングカーソル（この場合は不要）
+      6 // limit - 取得件数
     ).subscribe({
       next: (response: PaginatedResponse<Manga>) => {
         console.log('[Client] レコメンデーション受信:', response);
         this.mangaList = response.data;
         this.hasMorePages = response.hasMore;
         this.nextCursor = response.nextCursor;
-        
+
         this.currentIndex = 0;
         this.currentManga = null; // 一度nullにして確実に更新を発生させる
         this.cdr.detectChanges(); // 変更を即時反映
-        
+
         setTimeout(() => {
           if (this.mangaList.length > 0) {
             this.currentManga = {...this.mangaList[0]};  // オブジェクトを複製して新しい参照を作成
@@ -895,7 +900,7 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ジャンル一覧を読み込む
-  loadGenres() {
+  fetchGenres() {
     console.log('[Client] ジャンル一覧を取得中...');
     this.mangaService.getGenreCounts().subscribe({
       next: (genreData) => {
@@ -1066,5 +1071,64 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
       active: false
     }));
     console.log('[Client] すべてのジャンル選択を解除しました');
+  }
+
+  // 漫画データを読み込む
+  loadMangaData(id: string): void {
+    console.log('[DEBUG] loadMangaData called with id:', id);
+    this.isLoading = true;
+    
+    this.mangaService.getMangaById(id).subscribe({
+      next: (data: Manga) => {
+        console.log('[DEBUG] Manga data loaded:', data);
+        this.displayManga = data;
+        this.isLoading = false;
+        
+        // SEO最適化：メタタグと構造化データを設定
+        this.seoService.setMangaDetailMeta(data);
+        
+        // 現在のタグを選択状態にする
+        if (data.tags && this.genres.length > 0) {
+          this.updateGenreSelection(data.tags);
+        }
+        
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('[ERROR] Failed to load manga data:', err);
+        this.isLoading = false;
+        this.error = '漫画データの読み込みに失敗しました。';
+      }
+    });
+  }
+
+  // 漫画データを読み込む
+  loadLatestManga() {
+    console.log('[Client] 最新の漫画データを取得');
+    this.loadManga();
+  }
+
+  // ジャンルを選択して検索を実行
+  private updateGenreSelection(tags: string[]) {
+    console.log('[Client] タグを選択状態にする:', tags);
+    this.selectedGenres = tags;
+    this.genres = this.genres.map(g => ({
+      ...g,
+      active: this.selectedGenres.includes(g.genre)
+    }));
+    console.log('[Client] 選択中のジャンル:', this.selectedGenres);
+  }
+
+  initPagination(): void {
+    this.currentCursor = null;
+    this.nextCursor = null;
+    this.cursorHistory = [];
+  }
+
+  checkAdultConfirmation(): void {
+    const hasConfirmedAge = localStorage.getItem('age_confirmed');
+    if (!hasConfirmedAge) {
+      this.showCustomAdultConfirmation();
+    }
   }
 }

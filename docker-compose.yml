@@ -1,5 +1,18 @@
 version: '3.8'
 services:
+  app:
+    build: .
+    container_name: manga-preview-app
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mongodb
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - MONGO_URI=mongodb://admin:your_secure_password@mongodb:27017/manga_preview?authSource=admin
+    restart: always
+
   mongodb:
     image: mongo:latest
     container_name: manga-preview-mongodb
