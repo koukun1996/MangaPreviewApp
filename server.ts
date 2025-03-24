@@ -66,7 +66,8 @@ function app(): express.Express {
 
   // 'Content-Security-Policy'ヘッダーを削除するミドルウェアを追加
   server.use((req, res, next) => {
-    res.removeHeader('Content-Security-Policy');
+    // CSPを削除するのではなく、必要なドメインへの接続を許可するCSPを設定
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:4000 https://eromanga-tachiyomi-shi.net;");
     next();
   });
 
