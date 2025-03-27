@@ -100,7 +100,7 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   // カスタムダイアログ用の状態
   showCustomDialog = false;
 
-  // スワイプ開始位置の保持
+  // タッチイベント用の変数
   private _swipeStart: Touch | null = null;
   private touchStartX = 0;
   private touchStartY = 0;
@@ -184,6 +184,9 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     
     // ジャンル一覧を取得
     this.fetchGenres();
+    
+    // タッチイベントの初期化
+    this.initTouchEvents();
   }
 
   ngAfterViewInit(): void {
@@ -210,6 +213,12 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy() {
     if (this.headerTimeout) {
       clearTimeout(this.headerTimeout);
+    }
+    
+    // タッチイベントリスナーを削除
+    if (isPlatformBrowser(this.platformId)) {
+      document.removeEventListener('touchstart', this.onTouchStart.bind(this));
+      document.removeEventListener('touchend', this.onTouchEnd.bind(this));
     }
   }
 
@@ -612,40 +621,71 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.currentManga.sampleImageUrls?.[this.currentImageIndex - 1] || this.currentManga.thumbnailUrl || "";
   }
 
+  // タッチイベントリスナーを初期化
+  private initTouchEvents(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      console.log('[DEBUG] Initializing touch events');
+      // タッチイベントリスナーはブラウザ環境でのみ追加
+      document.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
+      document.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
+    }
+  }
+
+  // タッチ開始イベントハンドラー
   onTouchStart(event: TouchEvent) {
     this.touchStartX = event.touches[0].clientX;
     this.touchStartY = event.touches[0].clientY;
     this.touchStartTime = Date.now();
+    console.log('[DEBUG] Touch start at X:', this.touchStartX, 'Y:', this.touchStartY);
   }
 
+  // タッチ終了イベントハンドラー
   onTouchEnd(event: TouchEvent) {
     this.touchEndX = event.changedTouches[0].clientX;
     this.touchEndY = event.changedTouches[0].clientY;
     const touchDuration = Date.now() - this.touchStartTime;
+    
+    console.log('[DEBUG] Touch end at X:', this.touchEndX, 'Y:', this.touchEndY);
+    console.log('[DEBUG] Touch duration:', touchDuration, 'ms');
 
     // タップ判定
     const deltaX = Math.abs(this.touchEndX - this.touchStartX);
     const deltaY = Math.abs(this.touchEndY - this.touchStartY);
 
+    // 検索やサイドバーが表示されている場合はスワイプを無効化
+    if (this.isSearchVisible || this.isSidebarVisible) {
+      console.log('[DEBUG] Swipe disabled due to open overlay');
+      return;
+    }
+
     if (deltaX < this.TAP_THRESHOLD && deltaY < this.TAP_THRESHOLD && touchDuration < this.TAP_DURATION) {
       // タップの場合は立ち読みページへ遷移
       // モバイルデバイスの場合のみイベント伝播を制御
       if (this.isMobileDevice) {
-        event.preventDefault(); // デフォルトのイベント動作を防止
-        event.stopPropagation(); // イベント伝播を停止
+        console.log('[DEBUG] Tap detected, navigating to tachiyomi');
+        if (event.target instanceof HTMLElement && event.target.closest('.manga-image-container')) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.goToTachiyomi();
+        }
       }
-      this.goToTachiyomi();
       return;
     }
 
     // スワイプ判定
     const swipeDistance = this.touchEndX - this.touchStartX;
-    if (Math.abs(swipeDistance) > this.SWIPE_THRESHOLD) {
+    const verticalDistance = Math.abs(this.touchEndY - this.touchStartY);
+    
+    // 水平方向のスワイプが垂直方向より大きい場合のみ処理
+    if (Math.abs(swipeDistance) > this.SWIPE_THRESHOLD && Math.abs(swipeDistance) > verticalDistance) {
+      console.log('[DEBUG] Swipe detected, distance:', swipeDistance);
       if (swipeDistance > 0) {
         // 右スワイプで前のページへ
+        console.log('[DEBUG] Right swipe, navigating to previous manga');
         this.previousManga();
       } else {
         // 左スワイプで次のページへ
+        console.log('[DEBUG] Left swipe, navigating to next manga');
         this.nextManga();
       }
     }

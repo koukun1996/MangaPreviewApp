@@ -379,14 +379,20 @@
 
 .controls {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 8px;
   padding: 10px;
   position: relative;
   z-index: 10;
-  height: 60px;
   background-color: #000000;
+
+  @media (max-width: 375px) {
+    /* iPhone SE2などの小さい画面用 */
+    gap: 5px;
+    padding: 10px 5px;
+  }
 }
 
 .nav-button {
@@ -398,11 +404,12 @@
   font-size: 12px;
   cursor: pointer;
   transition: background-color 0.2s;
-  margin: 0 5px;
-  flex: 0;
-  min-width: 60px;
-  max-width: 80px;
-  height: 40px;
+  flex: 2; /* 比率配分 */
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 40px;
   
   &:hover {
     background-color: #444444;
@@ -412,9 +419,61 @@
     background-color: #cccccc;
     cursor: not-allowed;
   }
+
+  @media (max-width: 768px) {
+    font-size: 11px;
+    padding: 8px 5px;
+  }
 }
 
-.buy-button, .tachiyomi-button, .recommend-button {
+.tachiyomi-button, .recommend-button {
+  flex: 3; /* 比率配分（合計で6） */
+  background-color: #000000;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 40px;
+  
+  &:hover {
+    background-color: #222222;
+  }
+  
+  &:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    padding: 8px 5px;
+  }
+}
+
+.tachiyomi-button {
+  background-color: #ff548e;
+  
+  &:hover {
+    background-color: #e13a7a;
+  }
+}
+
+.recommend-button {
+  background-color: #7e57c2;
+  
+  &:hover {
+    background-color: #673ab7;
+  }
+}
+
+.buy-button {
   background-color: #000000;
   color: white;
   border: none;
@@ -436,23 +495,6 @@
   &:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
-  }
-}
-
-.tachiyomi-button {
-  white-space: nowrap;
-  background-color: #ff548e;
-  
-  &:hover {
-    background-color: #e13a7a;
-  }
-}
-
-.recommend-button {
-  background-color: #7e57c2;
-  
-  &:hover {
-    background-color: #673ab7;
   }
 }
 
