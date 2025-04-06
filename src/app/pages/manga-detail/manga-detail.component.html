@@ -13,7 +13,16 @@
   </div>
 
   <!-- 漫画詳細表示 -->
-  <div *ngIf="manga && !isLoading" class="manga-content">
+  <article *ngIf="manga && !isLoading" class="manga-content" itemscope itemtype="https://schema.org/CreativeWork">
+    <!-- パンくずリスト -->
+    <nav aria-label="パンくずリスト" class="breadcrumb">
+      <ol>
+        <li><a href="/">エロ漫画立ち読み市</a></li>
+        <li><a [href]="'/author/' + manga.author">{{ manga.author }}</a></li>
+        <li aria-current="page">{{ manga.title }}</li>
+      </ol>
+    </nav>
+
     <div class="back-button-container">
       <button mat-icon-button (click)="goBack()" aria-label="戻る">
         <mat-icon>arrow_back</mat-icon>
@@ -23,23 +32,23 @@
     <!-- メイン情報 -->
     <mat-card class="manga-card">
       <div class="manga-header">
-        <h1 class="manga-title">{{ manga.title }}</h1>
-        <p class="manga-author" (click)="navigateToAuthor(manga.author)">作者: {{ manga.author }}</p>
+        <h1 class="manga-title" itemprop="name">{{ manga.title }}</h1>
+        <p class="manga-author" (click)="navigateToAuthor(manga.author)" itemprop="author">作者: {{ manga.author }}</p>
       </div>
 
       <div class="manga-main-content">
         <div class="manga-thumbnail">
-          <img [src]="manga.thumbnailUrl" [alt]="manga.title" class="thumbnail-img">
+          <img [src]="manga.thumbnailUrl" [alt]="manga.title + ' - エロ漫画立ち読み市'" class="thumbnail-img" itemprop="image">
         </div>
 
         <div class="manga-info">
-          <p class="manga-description" *ngIf="manga.description">{{ manga.description }}</p>
+          <p class="manga-description" *ngIf="manga.description" itemprop="description">{{ manga.description }}</p>
           
           <div class="manga-tags">
             <h3>タグ</h3>
             <div class="tags-container">
               <mat-chip-set>
-                <mat-chip *ngFor="let tag of manga.tags" (click)="navigateToTag(tag)" color="primary">
+                <mat-chip *ngFor="let tag of manga.tags" (click)="navigateToTag(tag)" color="primary" itemprop="keywords">
                   {{ tag }}
                 </mat-chip>
               </mat-chip-set>
@@ -48,7 +57,10 @@
 
           <div class="manga-price" *ngIf="manga.price">
             <h3>価格</h3>
-            <p>{{ manga.price }}円</p>
+            <p itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+              <span itemprop="price">{{ manga.price }}</span>
+              <meta itemprop="priceCurrency" content="JPY">円
+            </p>
           </div>
 
           <div class="manga-actions">
@@ -66,22 +78,28 @@
       <div class="manga-samples" *ngIf="manga.sampleImageUrls && manga.sampleImageUrls.length > 0">
         <h3>サンプル画像</h3>
         <div class="sample-images">
-          <div *ngFor="let img of manga.sampleImageUrls" class="sample-image-container">
-            <img [src]="img" alt="サンプル画像" class="sample-img">
+          <div *ngFor="let img of manga.sampleImageUrls; let i = index" class="sample-image-container">
+            <img [src]="img" [alt]="manga.title + ' サンプル画像 ' + (i+1) + ' - エロ漫画立ち読み市'" class="sample-img">
           </div>
         </div>
       </div>
     </mat-card>
 
     <!-- 関連作品 -->
-    <div class="related-manga" *ngIf="relatedManga && relatedManga.length > 0">
+    <section class="related-manga" *ngIf="relatedManga && relatedManga.length > 0">
       <h2>関連作品</h2>
       <div class="related-manga-grid">
         <div *ngFor="let related of relatedManga" class="related-manga-item" (click)="loadMangaDetails(related.fanzaId)">
-          <img [src]="related.thumbnailUrl" [alt]="related.title" class="related-thumbnail">
+          <img [src]="related.thumbnailUrl" [alt]="related.title + ' - エロ漫画立ち読み市'" class="related-thumbnail">
           <p class="related-title">{{ related.title }}</p>
         </div>
       </div>
+    </section>
+
+    <!-- サイト名+作品名のテキスト（SEO用） -->
+    <div class="seo-text">
+      <h2>エロ漫画立ち読み市で「{{ manga.title }}」を立ち読み</h2>
+      <p>「エロ漫画立ち読み市 {{ manga.title }}」で検索すれば、{{ manga.author }}先生の作品「{{ manga.title }}」の詳細情報や立ち読みサンプルをご覧いただけます。タグ：{{ manga.tags?.join('、') }}など、様々なジャンルの作品を多数取り揃えています。</p>
     </div>
 
     <!-- 下部ナビゲーション -->
@@ -90,5 +108,5 @@
         <mat-icon>home</mat-icon> トップページに戻る
       </button>
     </div>
-  </div>
+  </article>
 </div> 

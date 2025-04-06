@@ -19,7 +19,7 @@
   background: #000000;
   color: #ffffff;
   overflow: hidden;
-  padding-top: 0;
+  padding: 0;
   
   &.mobile-view {
     // モバイル用のスタイル
@@ -36,12 +36,11 @@
   display: flex;
   flex-direction: column;
   padding: 0;
-  padding-top: 0;
-  padding-bottom: 0;
   overflow: auto;
   align-items: center;
-  gap: 0.1rem;
-  margin-top: 1rem;
+  gap: 0;
+  margin: 0;
+  background: #000000;
 }
 
 .top-controls {
@@ -50,7 +49,7 @@
   align-items: center;
   width: 100%;
   max-width: 800px;
-  padding: 0.4rem 1rem;
+  padding: 0.4rem 0.5rem;
   margin: 0 auto;
   background-color: #000000;
   border-bottom: none;
@@ -60,27 +59,16 @@
     padding: 0.4rem 0.5rem;
     margin-bottom: 0.5rem;
   }
-}
-
-.site-title {
-  cursor: pointer;
-  max-width: 80%;
-  overflow: hidden;
-  h1 {
-    margin: 0;
-    font-size: 1.3rem;
-    line-height: 1.2;
+  
+  .manga-title-container {
+    flex: 1;
+    font-size: 1.2rem;
+    font-weight: 600;
     color: #ffffff;
-    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-align: left;
-    
-    @media (max-width: 768px) {
-      font-size: 1rem;
-      max-width: 100%;
-    }
+    padding-right: 10px;
   }
 }
 
@@ -89,10 +77,10 @@
   gap: 0.5rem;
 }
 
-.help-button, .search-toggle {
+.help-button, .search-toggle, .hamburger-menu {
   background: none;
   border: none;
-  color: white;
+  color: #ffffff;
   padding: 0.5rem;
   cursor: pointer;
   opacity: 0.8;
@@ -114,7 +102,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.9);
+  background-color: rgba(0, 0, 0, 0.95);
   z-index: 1000;
   display: flex;
   justify-content: center;
@@ -126,7 +114,7 @@
 .search-wrapper {
   width: 90%;
   max-width: 600px;
-  background-color: #111;
+  background-color: #121212;
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
@@ -134,7 +122,8 @@
   transform: translateY(-20px);
   transition: opacity 0.3s, transform 0.3s;
   max-height: 80vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   border: 1px solid #333;
 
   &.visible {
@@ -145,6 +134,7 @@
 
 .search-container {
   margin-bottom: 16px;
+  flex-shrink: 0; // 縮小しないように固定
 
   .search-input {
     width: 100%;
@@ -172,6 +162,10 @@
   margin-top: 16px;
   border-top: 1px solid #333;
   padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; // Flexboxで正しく動作するために必要
 }
 
 .genre-header {
@@ -179,6 +173,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  flex-shrink: 0; // 縮小しないように固定
   
   h3 {
     margin: 0;
@@ -201,13 +196,60 @@
   }
 }
 
+// 検索ボタンコンテナを固定位置に
+.search-button-container {
+  margin: 0 0 16px 0;
+  flex-shrink: 0; // 縮小しないように固定
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: #121212;
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+  
+  .search-button {
+    width: 100%;
+    padding: 12px 0;
+    background-color: #0066ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    
+    &:hover {
+      background-color: #0055cc;
+    }
+  }
+}
+
 .genre-list-container {
   max-height: 0;
-  overflow: hidden;
+  overflow-y: hidden;
   transition: max-height 0.5s ease;
   
   &.visible {
-    max-height: 500px;
+    max-height: 45vh; // 画面の45%の高さまで表示
+    overflow-y: auto; // スクロール可能に
+    // スクロールバーのスタイリング
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #1a1a1a;
+      border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
   }
 }
 
@@ -327,41 +369,40 @@
   justify-content: space-between;
   width: 100%;
   height: 100%;
-  padding: 0 0 20px 0;
+  padding: 0;
   position: relative;
 }
 
-.image-wrapper {
-  width: 100%;
+.manga-image-wrapper {
   display: flex;
   justify-content: center;
-  align-items: center;
-  flex: 1;
-  margin-bottom: 20px;
-}
-
-.manga-image-container {
-  position: relative;
+  margin-bottom: 4px;
   width: 100%;
-  max-width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 300px; // 最小高さを設定
-  max-height: calc(100vh - 180px); // 最大高さを制限
-  overflow: hidden;
   
-  &.pc-container {
+  .manga-image-container {
+    max-width: 100%;
+    width: 100%;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    position: relative;
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    background-color: #121212;
+    transition: transform 0.2s;
+    height: calc(100vh - 180px); /* 画面の高さから他の要素の高さを引いた値 */
     
     &:hover {
-      transform: scale(1.01);
+      transform: translateY(-5px);
     }
-  }
-  
-  &.mobile-container {
-    touch-action: manipulation;
+    
+    img {
+      max-width: 100%;
+      width: 100%;
+      height: 100%; /* 親要素の高さいっぱいに */
+      display: block;
+      margin: 0 auto;
+      object-fit: cover; /* containからcoverに変更 */
+    }
   }
 }
 
@@ -369,107 +410,91 @@
   max-width: 100%;
   max-height: 100%;
   height: auto;
-  object-fit: contain; // アスペクト比を維持
+  object-fit: cover; /* containからcoverに変更 */
 }
 
 .controls-wrapper {
-  width: 100%;
-  overflow: hidden;
-}
-
-.controls {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  gap: 8px;
-  padding: 10px;
-  position: relative;
-  z-index: 10;
-  background-color: #000000;
-
-  @media (max-width: 375px) {
-    /* iPhone SE2などの小さい画面用 */
-    gap: 5px;
-    padding: 10px 5px;
-  }
-}
-
-.nav-button {
-  background-color: #333333;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  flex: 2; /* 比率配分 */
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-height: 40px;
+  justify-content: center;
+  margin-top: 10px;
   
-  &:hover {
-    background-color: #444444;
-  }
-  
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 11px;
-    padding: 8px 5px;
-  }
-}
-
-.tachiyomi-button, .recommend-button {
-  flex: 3; /* 比率配分（合計で6） */
-  background-color: #000000;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 10px 15px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-height: 40px;
-  
-  &:hover {
-    background-color: #222222;
-  }
-  
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 12px;
-    padding: 8px 5px;
-  }
-}
-
-.tachiyomi-button {
-  background-color: #ff548e;
-  
-  &:hover {
-    background-color: #e13a7a;
-  }
-}
-
-.recommend-button {
-  background-color: #7e57c2;
-  
-  &:hover {
-    background-color: #673ab7;
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    justify-content: center;
+    
+    @media (max-width: 340px) {
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      font-size: 0.85rem;
+      
+      &.nav-button {
+        background-color: #333333;
+        color: #ffffff;
+        min-width: 50px;
+        display: inline-block;
+        text-align: center;
+        
+        &:hover:not([disabled]) {
+          background-color: #444444;
+          transform: translateY(-2px);
+          box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        &[disabled] {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+      
+      &.tachiyomi-button {
+        background-color: #ff6b81;
+        color: white;
+        min-width: 100px;
+        display: inline-block;
+        text-align: center;
+        
+        &:hover:not([disabled]) {
+          background-color: #ff5268;
+          transform: translateY(-2px);
+          box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        &[disabled] {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+      
+      &.recommend-button {
+        background-color: #4c8bf5;
+        color: white;
+        min-width: 80px;
+        display: inline-block;
+        text-align: center;
+        
+        &:hover:not([disabled]) {
+          background-color: #3a7ce0;
+          transform: translateY(-2px);
+          box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        &[disabled] {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+    }
   }
 }
 
@@ -516,7 +541,7 @@
     max-width: 500px;
     padding: 20px;
     border-radius: 8px;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: #121212;
     border: 1px solid #333;
     
     h3 {
@@ -728,7 +753,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.9);
   z-index: 2000;
   display: flex;
   justify-content: center;
@@ -919,43 +944,514 @@
           text-decoration: none;
         }
       }
+      
+      &.fanza-credit-sidebar {
+        padding: 1rem 0;
+        margin-top: 1rem;
+        border-top: 1px solid #333;
+        display: flex;
+        justify-content: center;
+        
+        &:hover {
+          background-color: transparent; // ホバー時の背景色変更を無効化
+        }
+        
+        a {
+          display: block;
+          
+          img {
+            display: block;
+          }
+        }
+      }
     }
   }
 }
 
-// 検索ボタン
-.search-button-container {
-  margin-top: 16px;
+/* 検索結果モード用のスタイル */
+.search-mode-header {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 15px;
+  
+  h2 {
+    font-size: 1.5rem;
+    margin: 0;
+    color: #ffffff;
+  }
+  
+  .back-to-normal {
+    background-color: #333333;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    
+    &:hover {
+      background-color: #444444;
+    }
+  }
 }
 
-.search-button {
-  background-color: #ff548e;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s;
-  width: 100%;
-  max-width: 300px;
+/* 通常表示モード用のスタイル（エロ漫画立ち読み市スタイル） */
+.manga-single-container {
+  max-width: 1000px;
+  margin: 0 auto 40px;
+  padding: 0;
+}
+
+.manga-single-header {
+  text-align: center;
+  margin-bottom: 20px;
   
-  svg {
-    margin-right: 8px;
+  .current-manga-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 8px;
+    line-height: 1.3;
+    padding: 0;
+    color: #333;
+    
+    @media (min-width: 768px) {
+      font-size: 1.8rem;
+    }
   }
   
-  &:hover {
-    background-color: #e13a7a;
-  }
-  
-  &:active {
-    background-color: #c42d68;
-    transform: translateY(1px);
+  .current-manga-author {
+    font-size: 1rem;
+    margin: 0;
+    color: #666;
   }
 }
+
+.manga-image-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+  width: 100%;
+  
+  .manga-image-container {
+    max-width: 100%;
+    width: 100%;
+    cursor: pointer;
+    position: relative;
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    background-color: #121212;
+    transition: transform 0.2s;
+    height: calc(100vh - 180px); /* 画面の高さから他の要素の高さを引いた値 */
+    
+    &:hover {
+      transform: translateY(-5px);
+    }
+    
+    img {
+      max-width: 100%;
+      width: 100%;
+      height: 100%; /* 親要素の高さいっぱいに */
+      display: block;
+      margin: 0 auto;
+      object-fit: cover; /* containからcoverに変更 */
+    }
+  }
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+  
+  .pagination-button {
+    padding: 8px 16px;
+    background-color: #f5f5f5;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    
+    &:hover:not([disabled]) {
+      background-color: #e0e0e0;
+    }
+    
+    &[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.loading-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  
+  .loading-spinner-small {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: #444;
+    animation: spin 1s ease-in-out infinite;
+    margin-bottom: 10px;
+  }
+  
+  p {
+    margin: 0;
+    color: #666;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 漫画グリッドレイアウト用スタイル */
+.manga-grid-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  color: #ffffff;
+}
+
+.manga-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2列のグリッド */
+  gap: 10px;
+  margin-bottom: 20px;
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr); /* タブレット: 2列のまま */
+  }
+  
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr); /* デスクトップ: 3列 */
+  }
+  
+  @media (min-width: 1280px) {
+    grid-template-columns: repeat(4, 1fr); /* 大画面: 4列 */
+  }
+}
+
+.manga-card {
+  background: #121212;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+  }
+  
+  .manga-thumbnail {
+    width: 100%;
+    position: relative;
+    padding-top: 70%; /* 縦幅を半分に変更（元は140%） */
+    overflow: hidden;
+    
+    img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+  
+  .manga-info {
+    padding: 8px;
+    
+    .manga-title {
+      font-size: 13px;
+      font-weight: bold;
+      margin: 0 0 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      color: #ffffff;
+    }
+    
+    .manga-author {
+      font-size: 11px;
+      color: #aaaaaa;
+      margin: 0;
+    }
+  }
+}
+
+/* ページネーションコントロール */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+  
+  .pagination-button {
+    background-color: #333333;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    margin: 0 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    
+    &:hover:not([disabled]) {
+      background-color: #444444;
+    }
+    
+    &[disabled] {
+      background-color: #222222;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+}
+
+/* 追加データ読み込み中のインジケータ */
+.loading-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 20px 0;
+  
+  .loading-spinner-small {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  p {
+    margin-top: 10px;
+    color: #aaaaaa;
+  }
+}
+
+/* 漫画詳細モーダル */
+.manga-detail-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.manga-detail-modal {
+  background: #121212;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  padding: 20px;
+  color: #ffffff;
+  
+  .close-modal {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 1;
+    color: #ffffff;
+  }
+  
+  .manga-detail-content {
+    padding: 10px;
+  }
+  
+  .manga-detail-header {
+    margin-bottom: 20px;
+    
+    h2 {
+      font-size: 20px;
+      margin: 0 0 10px;
+      color: #ffffff;
+    }
+    
+    p {
+      margin: 0;
+      color: #aaaaaa;
+    }
+  }
+  
+  .manga-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 20px;
+    
+    @media (min-width: 768px) {
+      flex-direction: row;
+    }
+    
+    .manga-detail-thumbnail {
+      flex: 0 0 150px;
+      
+      @media (min-width: 768px) {
+        flex: 0 0 200px;
+      }
+      
+      img {
+        width: 100%;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      }
+    }
+    
+    .manga-detail-info {
+      flex: 1;
+      
+      .manga-description {
+        line-height: 1.6;
+        margin-bottom: 15px;
+        color: #dddddd;
+      }
+      
+      .manga-tags {
+        margin-bottom: 15px;
+        
+        h4 {
+          margin: 0 0 10px;
+          color: #ffffff;
+        }
+        
+        .tag-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          
+          .tag-item {
+            background: #333333;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #dddddd;
+            
+            &:hover {
+              background: #444444;
+            }
+          }
+        }
+      }
+      
+      .manga-price {
+        margin-bottom: 15px;
+        
+        h4 {
+          margin: 0 0 5px;
+          color: #ffffff;
+        }
+        
+        p {
+          font-weight: bold;
+          color: #ff69b4;
+        }
+      }
+      
+      .manga-action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        
+        button {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: background-color 0.3s;
+          
+          &.purchase-button {
+            background-color: #ff69b4;
+            color: white;
+            
+            &:hover {
+              background-color: #ff1493;
+            }
+          }
+          
+          &.preview-button {
+            background-color: #4a90e2;
+            color: white;
+            
+            &:hover {
+              background-color: #3a80d2;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  .manga-samples {
+    h3 {
+      margin: 0 0 15px;
+      color: #ffffff;
+    }
+    
+    .sample-images-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      
+      @media (min-width: 768px) {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .sample-image {
+        img {
+          width: 100%;
+          border-radius: 4px;
+        }
+      }
+    }
+  }
+}
+
+/* 既存のスタイルとの整合性を保つためのスタイル調整 */
+.manga-content {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* アニメーション */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 検索結果モード用のスタイル */

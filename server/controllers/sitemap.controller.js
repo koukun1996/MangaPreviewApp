@@ -18,6 +18,8 @@ exports.generateSitemap = async (req, res) => {
     const staticUrls = [
       { url: [{ loc: domain }], changefreq: 'daily', priority: '1.0' },
       { url: [{ loc: `${domain}/search` }], changefreq: 'daily', priority: '0.8' },
+      { url: [{ loc: `${domain}/tags` }], changefreq: 'weekly', priority: '0.7' },
+      { url: [{ loc: `${domain}/authors` }], changefreq: 'weekly', priority: '0.7' },
     ];
     
     // 漫画データを取得（最大50,000件まで）
@@ -30,10 +32,14 @@ exports.generateSitemap = async (req, res) => {
     
     // 漫画詳細ページのURLを作成
     const mangaUrls = mangaItems.map(manga => {
+      // 日本語URLをエンコード
+      const encodedId = encodeURIComponent(manga.fanzaId);
+      const lastmod = moment(manga.updatedAt).format('YYYY-MM-DD');
+      
       return {
         url: [
-          { loc: `${domain}/manga/${manga.fanzaId}` },
-          { lastmod: moment(manga.updatedAt).format('YYYY-MM-DD') },
+          { loc: `${domain}/manga/${encodedId}` },
+          { lastmod: lastmod },
           { changefreq: 'weekly' },
           { priority: '0.7' }
         ]
@@ -49,9 +55,12 @@ exports.generateSitemap = async (req, res) => {
     });
     
     const tagUrls = Array.from(uniqueTags).map(tag => {
+      // 日本語タグ名をエンコード
+      const encodedTag = encodeURIComponent(tag);
+      
       return {
         url: [
-          { loc: `${domain}/tag/${encodeURIComponent(tag)}` },
+          { loc: `${domain}/tag/${encodedTag}` },
           { changefreq: 'weekly' },
           { priority: '0.6' }
         ]
@@ -67,9 +76,12 @@ exports.generateSitemap = async (req, res) => {
     });
     
     const authorUrls = Array.from(uniqueAuthors).map(author => {
+      // 日本語作者名をエンコード
+      const encodedAuthor = encodeURIComponent(author);
+      
       return {
         url: [
-          { loc: `${domain}/author/${encodeURIComponent(author)}` },
+          { loc: `${domain}/author/${encodedAuthor}` },
           { changefreq: 'weekly' },
           { priority: '0.6' }
         ]
@@ -82,7 +94,10 @@ exports.generateSitemap = async (req, res) => {
     // XMLフォーマットでサイトマップを生成
     const sitemap = {
       urlset: [
-        { _attr: { xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9' } },
+        { _attr: { 
+          xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
+          'xmlns:xhtml': 'http://www.w3.org/1999/xhtml'
+        }},
         ...allUrls
       ]
     };

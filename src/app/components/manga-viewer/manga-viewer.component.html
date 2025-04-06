@@ -20,10 +20,10 @@
   </div>
 
   <!-- 漫画データがある場合の表示 -->
-  <div *ngIf="currentManga && mangaList.length > 0" class="manga-content">
+  <div *ngIf="mangaList.length > 0" class="manga-content">
     <div class="top-controls">
-      <div class="site-title" (click)="loadManga()">
-        <h1 *ngIf="currentManga">{{ currentManga.title }}</h1>
+      <div class="manga-title-container" *ngIf="!isSearchResultMode && currentManga">
+        {{ currentManga.title }}
       </div>
       <div class="top-buttons">
         <button class="search-toggle" (click)="toggleSearch()">
@@ -48,6 +48,12 @@
       <ul>
         <li><a href="https://x.com/ermncontent" target="_blank">運営者のXアカウント</a></li>
         <li (click)="showHelpModal()">ヘルプ</li>
+        <!-- FANZAリンクをサイドメニューに追加 -->
+        <li class="fanza-credit-sidebar">
+          <a href="https://affiliate.dmm.com/api/">
+            <img src="https://p.dmm.co.jp/p/affiliate/web_service/r18_135_17.gif" width="135" height="17" alt="WEB SERVICE BY FANZA">
+          </a>
+        </li>
         <!-- 他のメニュー項目をここに追加 -->
       </ul>
     </div>
@@ -119,10 +125,50 @@
       </div>
     </div>
 
-    <div class="manga-container">
-      <div class="image-wrapper">
+    <!-- 検索結果表示モード（4枚グリッド表示） -->
+    <div *ngIf="isSearchResultMode" class="manga-grid-container">
+      <div class="search-mode-header">
+        <h2>検索結果</h2>
+        <button class="back-to-normal" (click)="exitSearchResultMode()">戻る</button>
+      </div>
+      
+      <div class="manga-grid">
+        <div *ngFor="let manga of mangaList" class="manga-card" (click)="selectMangaAndExit(manga)">
+          <div class="manga-thumbnail">
+            <img [src]="manga.thumbnailUrl" [alt]="manga.title" loading="lazy">
+          </div>
+          <div class="manga-info">
+            <h3 class="manga-title">{{ manga.title }}</h3>
+            <p class="manga-author">{{ manga.author }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ページネーションコントロール -->
+      <div class="pagination-controls" *ngIf="mangaList.length > 0">
+        <button (click)="fetchPreviousPage()" class="pagination-button" 
+                [disabled]="isLoading || cursorHistory.length === 0">
+          前のページ
+        </button>
+        <button (click)="fetchNextPage()" class="pagination-button" 
+                [disabled]="isLoading || !hasMorePages">
+          次のページ
+        </button>
+      </div>
+      
+      <!-- ローディング表示（追加データ読み込み中） -->
+      <div *ngIf="isLoadingMore" class="loading-more">
+        <div class="loading-spinner-small"></div>
+        <p>もっと読み込み中...</p>
+      </div>
+    </div>
+
+    <!-- 通常表示モード（単一漫画表示） -->
+    <div *ngIf="!isSearchResultMode && currentManga" class="manga-single-container">
+      
+      <div class="manga-image-wrapper">
         <div class="manga-image-container" (click)="!isMobileDevice && goToTachiyomi()">
-          <img [src]="getCurrentImage()" [alt]="currentManga.title" />
+          <img [src]="getCurrentImage()" [alt]="currentManga.title" (load)="onImageLoad()" />
         </div>
       </div>
       
@@ -143,17 +189,11 @@
           </button>
         </div>
       </div>
-      
-      <div class="fanza-credit">
-        <a href="https://affiliate.dmm.com/api/">
-          <img src="https://p.dmm.co.jp/p/affiliate/web_service/r18_135_17.gif" width="135" height="17" alt="WEB SERVICE BY FANZA">
-        </a>
-      </div>
     </div>
   </div>
 
   <!-- 検索結果なしのメッセージ -->
-  <div *ngIf="!isLoading && !currentManga && mangaList.length === 0" class="no-results">
+  <div *ngIf="!isLoading && mangaList.length === 0" class="no-results">
     <div class="error-message">
       <h3>漫画データが見つかりませんでした</h3>
       <p *ngIf="selectedGenres.length > 0 || searchTerm">検索条件に一致する漫画が見つかりませんでした。検索条件を変更してお試しください。</p>
@@ -169,16 +209,72 @@
     </div>
   </div>
 
+  <!-- 漫画詳細モーダル -->
+  <div *ngIf="selectedManga" class="manga-detail-modal-overlay" (click)="closeSelectedManga()">
+    <div class="manga-detail-modal" (click)="$event.stopPropagation()">
+      <button class="close-modal" (click)="closeSelectedManga()">×</button>
+      
+      <div class="manga-detail-content">
+        <div class="manga-detail-header">
+          <h2>{{ selectedManga.title }}</h2>
+          <p>作者: {{ selectedManga.author }}</p>
+        </div>
+        
+        <div class="manga-detail-main">
+          <div class="manga-detail-thumbnail">
+            <img [src]="selectedManga.thumbnailUrl" [alt]="selectedManga.title">
+          </div>
+          
+          <div class="manga-detail-info">
+            <p *ngIf="selectedManga.description" class="manga-description">{{ selectedManga.description }}</p>
+            
+            <div class="manga-tags" *ngIf="selectedManga.tags && selectedManga.tags.length > 0">
+              <h4>タグ</h4>
+              <div class="tag-list">
+                <span *ngFor="let tag of selectedManga.tags" class="tag-item" (click)="searchByTag(tag)">{{ tag }}</span>
+              </div>
+            </div>
+            
+            <div class="manga-price" *ngIf="selectedManga.price">
+              <h4>価格</h4>
+              <p>{{ selectedManga.price }}円</p>
+            </div>
+            
+            <div class="manga-action-buttons">
+              <button *ngIf="selectedManga.affiliateUrl" class="purchase-button" (click)="openPurchaseLink(selectedManga)">
+                購入する
+              </button>
+              <button *ngIf="selectedManga.tachiyomiUrl" class="preview-button" (click)="openPreviewLink(selectedManga)">
+                立ち読みする
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- サンプル画像がある場合 -->
+        <div class="manga-samples" *ngIf="selectedManga.sampleImageUrls && selectedManga.sampleImageUrls.length > 0">
+          <h3>サンプル画像</h3>
+          <div class="sample-images-container">
+            <div *ngFor="let img of selectedManga.sampleImageUrls; let i = index" class="sample-image">
+              <img [src]="img" [alt]="selectedManga.title + ' サンプル画像 ' + (i+1)" loading="lazy">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 使い方モーダル -->
   <div *ngIf="isHelpModalVisible" class="help-modal-overlay" (click)="closeHelpModal()">
     <div class="help-modal" (click)="$event.stopPropagation()">
       <button class="close-help-modal" (click)="closeHelpModal()">×</button>
       <h3>エロ漫画立ち読み市 の利用方法</h3>
       <ul>
-        <li>左右スワイプで画像を切り替えできます</li>
-        <li>「商品ページへ」ボタンで詳細を確認できます</li>
-        <li>「立ち読みページへ」ボタンでちょっとだけ読めます</li>
-        <li>検索アイコンをタップして作品を検索できます</li>
+        <li>検索すると、一覧表示で漫画を選べます</li>
+        <li>通常表示では、左右のボタンで漫画を切り替えられます</li>
+        <li>作品をタップすると詳細を確認できます</li>
+        <li>「購入する」ボタンで公式サイトに移動できます</li>
+        <li>「立ち読みする」ボタンでサンプルを読めます</li>
       </ul>
       <div class="help-modal-footer">
         <a href="https://www.dlsite.com/maniax/" target="_blank">作った奴のホームページ</a>

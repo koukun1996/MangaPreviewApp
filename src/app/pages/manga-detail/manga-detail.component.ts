@@ -44,10 +44,12 @@ export class MangaDetailComponent implements OnInit, OnDestroy {
     this.routeSub = this.route.params.subscribe(params => {
       const id = params['id'];
       if (id) {
+        console.log(`[MangaDetailComponent] 漫画ID:${id}の詳細を読み込みます`);
         this.loadMangaDetails(id);
       } else {
         this.error = 'マンガIDが見つかりません';
         this.isLoading = false;
+        console.error('[MangaDetailComponent] URLにマンガIDが指定されていません');
       }
     });
   }
@@ -61,8 +63,16 @@ export class MangaDetailComponent implements OnInit, OnDestroy {
   loadMangaDetails(id: string): void {
     this.mangaService.getMangaById(id).subscribe({
       next: (data) => {
+        if (!data || !data.fanzaId) {
+          console.error(`[MangaDetailComponent] ID:${id}の漫画データが不完全です:`, data);
+          this.error = '漫画情報の読み込みに失敗しました。データが見つかりません。';
+          this.isLoading = false;
+          return;
+        }
+        
         this.manga = data;
         this.isLoading = false;
+        console.log(`[MangaDetailComponent] 漫画データを取得しました:`, data.title);
         
         // SEO最適化：メタタグと構造化データを設定
         this.seoService.setMangaDetailMeta(data);
@@ -71,8 +81,8 @@ export class MangaDetailComponent implements OnInit, OnDestroy {
         this.loadRelatedManga(data);
       },
       error: (err) => {
-        console.error('Failed to load manga details:', err);
-        this.error = '漫画情報の読み込みに失敗しました。';
+        console.error('[MangaDetailComponent] 漫画詳細の読み込み中にエラーが発生しました:', err);
+        this.error = '漫画情報の読み込みに失敗しました。サーバーが応答していないか、データが存在しません。';
         this.isLoading = false;
       }
     });

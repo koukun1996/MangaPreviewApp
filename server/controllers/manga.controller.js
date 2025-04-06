@@ -138,16 +138,49 @@ exports.searchByTagsOrAuthor = async (req, res) => {
     
     if (query) {
       // 検索クエリが指定されている場合
-      const searchQuery = query.toLowerCase();
-      console.log('検索クエリ:', searchQuery);
+      console.log('元の検索クエリ:', query);
       
+      // クエリを分解して検索条件を構築
+      let searchTerms = [];
+      
+      // 「サイト名+作品名」の形式を処理
+      if (query.includes('+')) {
+        // +で分割して各部分で検索
+        searchTerms = query.split('+').map(term => term.trim()).filter(term => term);
+        console.log('「+」で分割した検索用語:', searchTerms);
+      } else {
+        // 空白で分割して各部分で検索
+        searchTerms = query.split(/\s+/).filter(term => term);
+        console.log('空白で分割した検索用語:', searchTerms);
+        
+        // 元のクエリも検索用語として追加
+        if (!searchTerms.includes(query)) {
+          searchTerms.push(query);
+        }
+      }
+      
+      // 各検索用語に対して条件を作成
       const searchConditions = {
-        $or: [
-          { tags: { $regex: searchQuery, $options: 'i' } },
-          { author: { $regex: searchQuery, $options: 'i' } },
-          { title: { $regex: searchQuery, $options: 'i' } }
-        ]
+        $or: []
       };
+      
+      // 完全一致の検索条件（元のクエリをそのまま使用）
+      searchConditions.$or.push(
+        { tags: { $regex: query, $options: 'i' } },
+        { author: { $regex: query, $options: 'i' } },
+        { title: { $regex: query, $options: 'i' } }
+      );
+      
+      // 分解した検索用語の条件を追加
+      for (const term of searchTerms) {
+        if (term.length >= 2) { // 2文字以上の用語のみ検索に使用
+          searchConditions.$or.push(
+            { tags: { $regex: term, $options: 'i' } },
+            { author: { $regex: term, $options: 'i' } },
+            { title: { $regex: term, $options: 'i' } }
+          );
+        }
+      }
       
       // 検索条件とカーソル条件を組み合わせる
       if (queryConditions.$or) {
@@ -166,15 +199,19 @@ exports.searchByTagsOrAuthor = async (req, res) => {
       .limit(parseInt(limit));
     
     // 取得したデータをログに表示
-    console.log('取得した漫画データ:', manga);
-    
     console.log(`検索結果: ${manga.length}件`);
+    if (manga.length > 0) {
+      console.log('最初の検索結果:', manga[0].title);
+    }
     
     // 次のページの情報を含めてレスポンスを返す
     if (manga.length === 0) {
-      return res.status(404).json({ 
-        error: '漫画データが見つかりませんでした',
-        message: '検索条件を変更するか、後でもう一度お試しください。'
+      // 検索結果が0件の場合、404ではなく200で空のデータを返す
+      return res.status(200).json({
+        data: [],
+        nextCursor: null,
+        hasMore: false,
+        message: '漫画データが見つかりませんでした。検索条件を変更するか、後でもう一度お試しください。'
       });
     }
     
@@ -308,18 +345,29 @@ exports.getMangaById = async (req, res) => {
       return res.status(400).json({ error: 'IDは必須です' });
     }
     
+    // デバッグのためにIDの形式を表示
+    console.log('取得しようとしているID:', id, 'タイプ:', typeof id);
+    
     // Mangaモデルが適切にロードされているか確認
     if (!MangaModel || typeof MangaModel.findOne !== 'function') {
       console.error('Mangaモデルが正しくロードされていません:', MangaModel);
       return res.status(500).json({ error: 'データベースモデルエラー' });
     }
     
-    const manga = await MangaModel.findOne({ fanzaId: id });
+    // タイトルまたはfanzaIdで検索
+    const manga = await MangaModel.findOne({ 
+      $or: [
+        { fanzaId: id },
+        { title: { $regex: id, $options: 'i' } }
+      ]
+    });
     
     if (!manga) {
+      console.log(`ID:${id}の漫画が見つかりませんでした`);
       return res.status(404).json({ error: '漫画が見つかりません' });
     }
     
+    console.log(`ID:${id}の漫画が見つかりました:`, manga.title);
     return res.status(200).json(manga);
   } catch (error) {
     console.error('漫画取得エラー:', error);
