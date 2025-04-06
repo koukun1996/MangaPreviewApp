@@ -14,15 +14,8 @@
 
   <!-- 漫画詳細表示 -->
   <article *ngIf="manga && !isLoading" class="manga-content" itemscope itemtype="https://schema.org/CreativeWork">
-    <!-- パンくずリスト -->
-    <nav aria-label="パンくずリスト" class="breadcrumb">
-      <ol>
-        <li><a href="/">エロ漫画立ち読み市</a></li>
-        <li><a [href]="'/author/' + manga.author">{{ manga.author }}</a></li>
-        <li aria-current="page">{{ manga.title }}</li>
-      </ol>
-    </nav>
-
+    <!-- パンくずリストを削除 -->
+    
     <div class="back-button-container">
       <button mat-icon-button (click)="goBack()" aria-label="戻る">
         <mat-icon>arrow_back</mat-icon>
@@ -86,10 +79,22 @@
     </mat-card>
 
     <!-- 関連作品 -->
-    <section class="related-manga" *ngIf="relatedManga && relatedManga.length > 0">
-      <h2>関連作品</h2>
+    <!-- 同じ作者の作品 -->
+    <section class="related-manga author-manga" *ngIf="sameAuthorManga && sameAuthorManga.length > 0">
+      <h2>{{ manga.author }}の他の作品</h2>
       <div class="related-manga-grid">
-        <div *ngFor="let related of relatedManga" class="related-manga-item" (click)="loadMangaDetails(related.fanzaId)">
+        <div *ngFor="let related of sameAuthorManga" class="related-manga-item" (click)="loadMangaDetails(related.fanzaId)">
+          <img [src]="related.thumbnailUrl" [alt]="related.title + ' - エロ漫画立ち読み市'" class="related-thumbnail">
+          <p class="related-title">{{ related.title }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 同じジャンルの作品 -->
+    <section class="related-manga genre-manga" *ngIf="sameGenreManga && sameGenreManga.length > 0">
+      <h2>同じジャンルの作品</h2>
+      <div class="related-manga-grid">
+        <div *ngFor="let related of sameGenreManga" class="related-manga-item" (click)="loadMangaDetails(related.fanzaId)">
           <img [src]="related.thumbnailUrl" [alt]="related.title + ' - エロ漫画立ち読み市'" class="related-thumbnail">
           <p class="related-title">{{ related.title }}</p>
         </div>

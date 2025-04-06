@@ -31,6 +31,8 @@ export class MangaDetailComponent implements OnInit, OnDestroy {
   error: string | null = null;
   relatedManga: Manga[] = [];
   private routeSub: Subscription | null = null;
+  sameAuthorManga: Manga[] = [];
+  sameGenreManga: Manga[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -89,26 +91,82 @@ export class MangaDetailComponent implements OnInit, OnDestroy {
   }
 
   loadRelatedManga(manga: Manga): void {
+    // 同じ作者の作品を取得
+    this.loadSameAuthorManga(manga);
+    
+    // 同じジャンルの作品を取得
+    this.loadSameGenreManga(manga);
+  }
+
+  /**
+   * 同じ作者の作品を取得
+   */
+  loadSameAuthorManga(manga: Manga): void {
+    if (!manga.author) {
+      return;
+    }
+
+    // 作者名を検索条件として使用
+    console.log(`[MangaDetailComponent] 同じ作者(${manga.author})の作品を検索`);
+    
+    const authors = [manga.author];
+    
+    this.mangaService.getRecommendations(
+      [], // genres
+      [], // tags
+      authors, // authors
+      [manga.fanzaId], // excludeIds - 現在の漫画は除外
+      null, // cursor
+      3 // limit - 最大3作品
+    ).subscribe({
+      next: (response) => {
+        if (response.data && response.data.length > 0) {
+          this.sameAuthorManga = response.data;
+          console.log(`[MangaDetailComponent] 同じ作者の作品: ${this.sameAuthorManga.length}件`);
+        } else {
+          this.sameAuthorManga = [];
+          console.log('[MangaDetailComponent] 同じ作者の作品は見つかりませんでした');
+        }
+      },
+      error: (err) => {
+        console.error('[MangaDetailComponent] 同じ作者の作品の取得に失敗:', err);
+        this.sameAuthorManga = [];
+      }
+    });
+  }
+
+  /**
+   * 同じジャンル/タグの作品を取得
+   */
+  loadSameGenreManga(manga: Manga): void {
     if (!manga.tags || manga.tags.length === 0) {
       return;
     }
 
     // 最大3つのタグを選択
     const selectedTags = manga.tags.slice(0, 3);
+    console.log(`[MangaDetailComponent] 関連タグで作品を検索: ${selectedTags.join(', ')}`);
     
     this.mangaService.getRecommendations(
       [], // genres
       selectedTags, // tags
       [], // authors
-      [manga.fanzaId], // excludeIds
+      [manga.fanzaId], // excludeIds - 現在の漫画とすでに取得した同じ作者の作品を除外
       null, // cursor
-      6 // limit
+      6 // limit - 最大6作品
     ).subscribe({
       next: (response) => {
-        this.relatedManga = response.data;
+        if (response.data && response.data.length > 0) {
+          this.sameGenreManga = response.data;
+          console.log(`[MangaDetailComponent] 同じジャンルの作品: ${this.sameGenreManga.length}件`);
+        } else {
+          this.sameGenreManga = [];
+          console.log('[MangaDetailComponent] 同じジャンルの作品は見つかりませんでした');
+        }
       },
       error: (err) => {
-        console.error('Failed to load related manga:', err);
+        console.error('[MangaDetailComponent] 同じジャンルの作品の取得に失敗:', err);
+        this.sameGenreManga = [];
       }
     });
   }
