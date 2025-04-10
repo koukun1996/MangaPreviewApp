@@ -27,6 +27,9 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      padding-top: 45px;
+      padding-bottom: 10px;
+      box-sizing: border-box;
     }
 
     .manga-single-container {
@@ -34,14 +37,15 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
-      max-height: calc(100dvh - 120px);
+      max-height: calc(100dvh - 90px);
       overflow: hidden;
+      margin-top: 10px;
     }
 
     .manga-image-wrapper {
       flex: 1;
       min-height: 0;
-      max-height: calc(100dvh - 120px);
+      max-height: calc(100dvh - 100px);
       margin-bottom: 0;
       overflow: hidden;
       
@@ -62,26 +66,49 @@
     }
 
     .controls-wrapper {
-      padding: 5px;
+      padding: 3px;
       background: rgba(0, 0, 0, 0.8);
-      position: sticky;
+      position: fixed;
       bottom: 0;
+      left: 0;
       width: 100%;
-      z-index: 10;
-      height: 50px;
+      z-index: 100;
+      height: 45px;
       margin-top: 0;
       box-sizing: border-box;
     }
 
     .top-controls {
-      height: 50px;
-      padding: 5px;
+      height: 45px;
+      padding: 3px;
       background: rgba(0, 0, 0, 0.8);
-      position: sticky;
+      position: fixed;
       top: 0;
-      z-index: 10;
+      left: 0;
+      width: 100%;
+      z-index: 100;
       box-sizing: border-box;
       margin-bottom: 0;
+    }
+    
+    .controls {
+      button {
+        padding: 4px 8px;
+        font-size: 12px;
+        min-height: 32px;
+        
+        &.nav-button {
+          min-width: 40px;
+        }
+        
+        &.tachiyomi-button {
+          min-width: 80px;
+        }
+        
+        &.recommend-button {
+          min-width: 60px;
+        }
+      }
     }
   }
   
