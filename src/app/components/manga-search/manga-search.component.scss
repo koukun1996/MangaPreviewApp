@@ -1,0 +1,556 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: 'Roboto', sans-serif;
+}
+
+.search-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  background-color: rgba(0, 0, 0, 0.95);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.search-wrapper {
+  padding: 20px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  
+  &.hidden {
+    display: none;
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  
+  &.visible {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-container {
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: #222;
+  color: #fff;
+  box-sizing: border-box;
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #0066ff;
+  }
+}
+
+// ジャンル選択セクション
+.genre-selection {
+  margin-top: 16px;
+  border-top: 1px solid #333;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.genre-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-shrink: 0; // 縮小しないように固定
+  
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+  
+  .genre-toggle {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: #0066ff;
+    font-size: 14px;
+    
+    svg {
+      margin-left: 4px;
+      transition: transform 0.3s;
+    }
+  }
+}
+
+// 検索ボタンコンテナ
+.search-button-container {
+  margin: 16px 0;
+  flex-shrink: 0; // 縮小しないように固定
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.95);
+  padding: 10px 0;
+  
+  .search-button {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    background-color: #0066ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s;
+    
+    &:hover {
+      background-color: #0052cc;
+    }
+    
+    &:active {
+      background-color: #003d99;
+    }
+  }
+}
+
+// ジャンルリストをスクロール可能にするためのコンテナ
+.genre-list-scroll-container {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  
+  &.visible {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+// ジャンルリストコンテナ
+.genre-list-container {
+  overflow-y: auto;
+  flex: 1;
+  max-height: calc(100vh - 200px); // 画面高さから上部要素の高さを引いた値
+}
+
+.selected-genre {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background-color: #222;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #444;
+  
+  .selected-genres-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    
+    span {
+      font-size: 14px;
+      color: #ccc;
+    }
+    
+    .clear-all-genres {
+      font-size: 12px;
+      color: #ff548e;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      
+      &:hover {
+        background-color: rgba(255, 84, 142, 0.1);
+      }
+    }
+  }
+  
+  .selected-genres-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .genre-badge {
+    padding: 4px 8px;
+    background-color: #0066ff;
+    color: white;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    
+    .clear-genre {
+      margin-left: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      
+      &:hover {
+        opacity: 0.8;
+      }
+    }
+  }
+}
+
+.genres-section-title {
+  margin: 16px 0 12px;
+  font-size: 14px;
+  color: #ccc;
+  border-bottom: 1px solid #333;
+  padding-bottom: 8px;
+}
+
+.genre-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 16px;
+  
+  .genre-tag {
+    padding: 6px 10px;
+    background-color: #333;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    
+    &:hover {
+      background-color: #444;
+      transform: translateY(-2px);
+    }
+    
+    &.active {
+      background-color: #0066ff;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0, 102, 255, 0.4);
+    }
+    
+    .genre-name {
+      margin-right: 4px;
+    }
+    
+    .genre-count {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+  }
+}
+
+// 検索結果グリッド表示
+.manga-grid-container {
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  max-width: 1400px;
+  margin: 0 auto;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.manga-results {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.search-mode-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  h2 {
+    font-size: 20px;
+    margin: 0;
+    color: #fff;
+  }
+  
+  .header-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .search-again-button {
+    background-color: #333;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    
+    &:hover {
+      background-color: #444;
+    }
+  }
+  
+  .back-to-normal {
+    background-color: #ff4081;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    
+    &:hover {
+      background-color: #ff2d70;
+    }
+  }
+}
+
+.manga-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* モバイル: 2列 */
+  gap: 15px;
+  
+  @media (min-width: 576px) {
+    grid-template-columns: repeat(3, 1fr); /* タブレット: 3列 */
+  }
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, 1fr); /* 小型デスクトップ: 4列 */
+  }
+  
+  @media (min-width: 992px) {
+    grid-template-columns: repeat(5, 1fr); /* デスクトップ: 5列 */
+  }
+  
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(6, 1fr); /* 大画面: 6列 */
+  }
+}
+
+.manga-card {
+  background-color: #222;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.manga-thumbnail {
+  width: 100%;
+  position: relative;
+  padding-top: 140%; /* 縦横比を維持 */
+  overflow: hidden;
+  
+  img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.manga-info {
+  padding: 10px;
+  
+  .manga-title {
+    font-size: 14px;
+    margin: 0 0 5px;
+    font-weight: bold;
+    color: #fff;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+  }
+  
+  .manga-author {
+    font-size: 12px;
+    color: #bbb;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 16px 0;
+  
+  .pagination-button {
+    padding: 8px 16px;
+    border: none;
+    background-color: #333;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    
+    &:hover:not([disabled]) {
+      background-color: #444;
+    }
+    
+    &[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.loading-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  
+  .loading-spinner-small {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: #0066ff;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+  }
+  
+  p {
+    margin: 0;
+    color: #ccc;
+  }
+}
+
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  
+  .loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: #0066ff;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  }
+  
+  p {
+    margin: 0;
+    color: white;
+    font-size: 16px;
+  }
+}
+
+.no-results {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  
+  .error-message {
+    max-width: 400px;
+    padding: 20px;
+    background-color: #121212;
+    border-radius: 8px;
+    border: 1px solid #333;
+    text-align: center;
+    
+    h3 {
+      color: #ff548e;
+      margin-bottom: 16px;
+    }
+    
+    p {
+      color: #ccc;
+      margin-bottom: 20px;
+    }
+    
+    .error-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      
+      button {
+        padding: 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        
+        &.reload-button {
+          background-color: #0066ff;
+          color: white;
+          
+          &:hover {
+            background-color: #0052cc;
+          }
+        }
+        
+        &.search-again-button {
+          background-color: #333;
+          color: white;
+          
+          &:hover {
+            background-color: #444;
+          }
+        }
+      }
+    }
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

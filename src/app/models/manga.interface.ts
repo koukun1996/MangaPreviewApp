@@ -13,6 +13,7 @@ export interface Manga {
   updatedAt: Date;
   offset?: number;
   sampleImageUrls?: string[];
+  isNew?: boolean;
 }
 
 // ジャンル情報の型定義

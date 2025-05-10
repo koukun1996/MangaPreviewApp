@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { Types } = mongoose;
 const importedModel = require('../models/manga.model');
 
 // モデルを正しく取得（ESModuleからCommonJSへの変換に対応）
@@ -132,7 +133,7 @@ exports.searchByTagsOrAuthor = async (req, res) => {
     if (lastId && lastUpdatedAt) {
       queryConditions.$or = [
         { updatedAt: { $lt: new Date(lastUpdatedAt) } },
-        { updatedAt: new Date(lastUpdatedAt), _id: { $lt: lastId } }
+        { updatedAt: new Date(lastUpdatedAt), _id: { $lt: new Types.ObjectId(String(lastId)) } }
       ];
     }
     
@@ -419,7 +420,7 @@ exports.getRecommendations = async (req, res) => {
         $match: {
           $or: [
             { updatedAt: { $lt: new Date(lastUpdatedAt) } },
-            { updatedAt: new Date(lastUpdatedAt), _id: { $lt: mongoose.Types.ObjectId(lastId) } }
+            { updatedAt: new Date(lastUpdatedAt), _id: { $lt: new Types.ObjectId(String(lastId)) } }
           ]
         }
       });
@@ -591,65 +592,107 @@ exports.getGenreCounts = async (req, res) => {
   }
 };
 
-// ジャンルで検索
+// ジャンルによる検索
 exports.searchByGenre = async (req, res) => {
   try {
-    const genreParam = req.query.genre; // ジャンルパラメータを取得
-    const limit = parseInt(req.query.limit, 10) || 20; // 取得件数
-    const lastId = req.query.lastId; // ページング用のID
-    const lastUpdatedAt = req.query.lastUpdatedAt; // ページング用の更新日時
+    console.log('[Server] searchByGenreリクエスト:', {
+      params: req.params,
+      query: req.query,
+      body: req.body
+    });
 
-    // ページング用のクエリを構築
-    let query = {};
-
-    // ジャンルが指定されている場合のみ条件を追加
-    if (genreParam) {
-      const genres = genreParam.split(',').map(g => g.trim()).filter(g => g);
-      console.log(`検索対象ジャンル (AND検索): ${genres.join(', ')}`);
-      
-      // AND検索に変更: すべてのジャンルを含むドキュメントを検索
-      if (genres.length > 0) {
-        // $allは配列内のすべての要素に一致するドキュメントを返す
-        query.tags = { $all: genres };
-      }
+    // 必須パラメータの確認
+    const { genre } = req.query;
+    if (!genre) {
+      return res.status(400).json({ error: 'ジャンルの指定が必要です' });
+    }
+    
+    // MangaModelが正しく読み込まれているか確認
+    if (!MangaModel) {
+      console.error('[Server] MangaModelが読み込まれていません');
+      return res.status(500).json({ error: 'サーバー内部エラー：データモデルの読み込みに失敗しました' });
+    }
+    
+    // MongoDB接続状態の確認
+    if (mongoose.connection.readyState !== 1) {
+      console.error('[Server] データベース接続エラー, 現在の状態:', mongoose.connection.readyState);
+      return res.status(500).json({ error: 'データベース接続エラー' });
     }
 
-    // ページング条件の追加
+    // ページネーションパラメータを取得（クエリパラメータから）
+    const limit = parseInt(req.query.limit) || 20; // デフォルト20件
+    
+    // カーソル情報を取得
+    const { lastId, lastUpdatedAt } = req.query;
+    
+    // 詳細なカーソル情報のログ出力
     if (lastId && lastUpdatedAt) {
-      query.$and = [
-        {
-          $or: [
-            { updatedAt: { $lt: new Date(lastUpdatedAt) } },
-            {
-              updatedAt: new Date(lastUpdatedAt),
-              _id: { $lt: mongoose.Types.ObjectId(lastId) }
-            }
-          ]
+      console.log('[Server] カーソル情報を受信:', {
+        lastId,
+        lastUpdatedAt,
+        lastIdType: typeof lastId,
+        lastUpdatedAtType: typeof lastUpdatedAt
+      });
+    }
+    
+    // ジャンル検索条件を構築
+    const genres = genre.split(','); // カンマ区切りのジャンルを配列に変換
+    console.log('[Server] 検索ジャンル:', genres);
+    
+    // クエリ構築
+    let query = {};
+    
+    // 複数ジャンルの場合はOR条件で検索
+    if (genres.length > 1) {
+      // 複数ジャンルをOR条件で検索
+      query = { tags: { $in: genres } };
+    } else {
+      // 単一ジャンルの場合
+      query = { tags: genre };
+    }
+    
+    // カーソル情報があれば追加
+    if (lastId && lastUpdatedAt) {
+      // updatedAt: -1, _id: -1 のソート順序と一致するカーソル条件
+      // 降順ソートでは $lt を使用
+      query.$or = [
+        { updatedAt: { $lt: new Date(lastUpdatedAt) } },
+        { 
+          updatedAt: new Date(lastUpdatedAt), 
+          _id: { $lt: lastId }
         }
       ];
     }
-
-    console.log('MongoDB検索クエリ:', JSON.stringify(query));
-
-    // 漫画データを取得（最新順）
-    const manga = await MangaModel.find(query)
-      .sort({ updatedAt: -1, _id: -1 })
-      .limit(limit + 1);  // 次のページがあるかチェックするため1件多く取得
-
-    // 取得したデータの件数をログに表示
-    console.log(`取得した漫画データ: ${manga.length}件`);
     
-    if (manga.length > 0) {
-      console.log('最初のデータ:', {
-        title: manga[0].title,
-        tags: manga[0].tags,
-      });
+    console.log('[Server] 実行クエリ:', JSON.stringify(query, null, 2));
+
+    // クエリ実行 - 更新日時が新しい順（降順）、同じ更新日時の場合はID降順
+    const mangaList = await MangaModel.find(query)
+      .sort({ updatedAt: -1, _id: -1 })
+      .limit(limit + 1) // 次ページ判定用に1件多く取得
+      .lean();
+
+    console.log('[Server] ジャンル検索結果件数:', mangaList.length);
+    
+    // 取得データの最初と最後のIDをログ出力
+    if (mangaList.length > 0) {
+      console.log('[Server] 取得データの最初のID:', mangaList[0]._id.toString());
+      console.log('[Server] 取得データの最初の更新日時:', mangaList[0].updatedAt);
+      
+      if (mangaList.length > 1) {
+        const lastItem = mangaList[mangaList.length - 1];
+        console.log('[Server] 取得データの最後のID:', lastItem._id.toString());
+        console.log('[Server] 取得データの最後の更新日時:', lastItem.updatedAt);
+      }
     }
-
-    const hasMore = manga.length > limit;
-    const results = hasMore ? manga.slice(0, limit) : manga;
-
-    // 次のカーソル情報を生成
+    
+    // 次ページがあるかをチェック（limit+1件取得したので、limit以上なら次ページあり）
+    const hasMore = mangaList.length > limit;
+    
+    // レスポンス用のデータを準備（次ページ判定用の余分なデータは除外）
+    const results = hasMore ? mangaList.slice(0, limit) : mangaList;
+    
+    // nextCursorを作成（次ページがある場合のみ）
     let nextCursor = null;
     if (hasMore && results.length > 0) {
       const lastItem = results[results.length - 1];
@@ -657,16 +700,21 @@ exports.searchByGenre = async (req, res) => {
         lastId: lastItem._id.toString(),
         lastUpdatedAt: lastItem.updatedAt.toISOString()
       };
+      console.log('[Server] 次ページカーソル:', nextCursor);
+    } else {
+      console.log('[Server] 次ページなし');
     }
-
+    
+    // レスポンスを返す
+    console.log('[Server] ジャンル検索レスポンス件数:', results.length, 'hasMore:', hasMore);
     return res.status(200).json({
       data: results,
-      nextCursor,
-      hasMore
+      hasMore,
+      nextCursor
     });
   } catch (error) {
-    console.error('ジャンル検索エラー:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('[Server] ジャンル検索エラー:', error);
+    return res.status(500).json({ error: 'ジャンル検索中にエラーが発生しました' });
   }
 };
 
@@ -721,7 +769,7 @@ exports.searchCombined = async (req, res) => {
           { updatedAt: { $lt: new Date(lastUpdatedAt) } },
           {
             updatedAt: new Date(lastUpdatedAt),
-            _id: { $lt: mongoose.Types.ObjectId(lastId) }
+            _id: { $lt: new Types.ObjectId(String(lastId)) }
           }
         ]
       });

@@ -3,6 +3,7 @@ import { MangaDocument } from '../../src/app/models/manga.interface';
 
 // mongoose.Documentを継承したMangaModelドキュメント型
 export interface MangaDocumentModel extends Document, Omit<MangaDocument, '_id'> {
+  isNew: boolean;
   generateKeywords: () => void;
   generateCombinations: (tags: string[]) => string[][];
 }

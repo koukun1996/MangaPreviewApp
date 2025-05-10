@@ -22,7 +22,7 @@ export interface PagingCursor {
  */
 export interface PaginatedResponse<T> {
   data: T[];
-  nextCursor: PagingCursor;
+  nextCursor: PagingCursor | null;
   hasMore: boolean;
 }
 
@@ -52,23 +52,29 @@ export class MangaService {
    * @returns 文字列のみを含む安全なカーソルオブジェクト
    */
   private createSafeCursor(cursor: PagingCursor | null): PagingCursor | null {
-    if (!cursor) return null;
+    if (!cursor) {
+      console.log('[MangaService] createSafeCursor: null cursor received');
+      return null;
+    }
     
     // 必要なプロパティがない場合はnullを返す
     if (!cursor.lastId || !cursor.lastUpdatedAt) {
-      console.warn('[MangaService] 不完全なカーソル情報:', cursor);
+      console.log('[MangaService] createSafeCursor: invalid cursor (missing properties)', cursor);
       return null;
     }
     
     try {
       // MongoDB ObjectIdの可能性があるので、プリミティブな文字列に変換
       // サーバーサイドのObjectId2エラーを回避するためのセーフティ処理
-      return {
+      const safeCursor = {
         lastId: String(cursor.lastId).replace(/ObjectId\(['"](.*)['"]\)/, '$1'),
         lastUpdatedAt: String(cursor.lastUpdatedAt)
       };
+      
+      console.log('[MangaService] createSafeCursor: created safe cursor', safeCursor);
+      return safeCursor;
     } catch (err) {
-      console.error('[MangaService] カーソル情報変換エラー:', err);
+      console.error('[MangaService] createSafeCursor: error creating safe cursor', err);
       return null;
     }
   }
@@ -96,26 +102,12 @@ export class MangaService {
       params = params
         .set('lastId', safeCursor.lastId)
         .set('lastUpdatedAt', safeCursor.lastUpdatedAt);
-      
-      console.log('[MangaService] 検索カーソル情報:', {
-        lastIdType: typeof safeCursor.lastId,
-        lastUpdatedAtType: typeof safeCursor.lastUpdatedAt,
-        lastId: safeCursor.lastId,
-        lastUpdatedAt: safeCursor.lastUpdatedAt
-      });
     }
 
-    console.log('[MangaService] 検索リクエスト:', { query, cursor: safeCursor, limit });
-    console.log('[MangaService] APIリクエスト:', `${this.API_BASE_URL}/api/manga/search`, params.toString());
-    
     // `/api/manga/search`エンドポイントを使用
     return this.http.get<PaginatedResponse<any>>(`${this.API_BASE_URL}/api/manga/search`, { params }).pipe(
-      tap(response => {
-        console.log('[MangaService] APIレスポンス受信:', response);
-      }),
       map((response) => {
         if (!response || !response.data || !Array.isArray(response.data)) {
-          console.warn('[MangaService] レスポンスデータが適切な形式ではありません:', response);
           return {
             data: [],
             nextCursor: { lastId: '', lastUpdatedAt: '' },
@@ -154,11 +146,7 @@ export class MangaService {
           hasMore: response.hasMore || false
         };
       }),
-      tap(response => {
-        console.log('[MangaService] 変換後のデータ:', response);
-      }),
       catchError(error => {
-        console.error('[MangaService] エラー発生:', error);
         return of({
           data: [],
           nextCursor: { lastId: '', lastUpdatedAt: '' },
@@ -216,25 +204,11 @@ export class MangaService {
       params = params
         .set('lastId', safeCursor.lastId)
         .set('lastUpdatedAt', safeCursor.lastUpdatedAt);
-      
-      console.log('[MangaService] レコメンドカーソル情報:', {
-        lastIdType: typeof safeCursor.lastId,
-        lastUpdatedAtType: typeof safeCursor.lastUpdatedAt,
-        lastId: safeCursor.lastId,
-        lastUpdatedAt: safeCursor.lastUpdatedAt
-      });
     }
     
-    console.log('[MangaService] レコメンドリクエスト:', { genres, tags, authors, excludeIds, cursor: safeCursor, limit });
-    console.log('[MangaService] APIリクエスト:', `${this.API_BASE_URL}/api/manga/recommendations`, params.toString());
-    
     return this.http.get<PaginatedResponse<any>>(`${this.API_BASE_URL}/api/manga/recommendations`, { params }).pipe(
-      tap(response => {
-        console.log('[MangaService] レコメンドレスポンス受信:', response);
-      }),
       map((response) => {
         if (!response || !response.data || !Array.isArray(response.data)) {
-          console.warn('[MangaService] レスポンスデータが適切な形式ではありません:', response);
           return {
             data: [],
             nextCursor: { lastId: '', lastUpdatedAt: '' },
@@ -275,7 +249,6 @@ export class MangaService {
         };
       }),
       catchError(error => {
-        console.error('[MangaService] レコメンドエラー発生:', error);
         return of({
           data: [],
           nextCursor: { lastId: '', lastUpdatedAt: '' },
@@ -286,63 +259,54 @@ export class MangaService {
   }
 
   /**
-   * 特定のジャンルに属する漫画を検索します。
+   * ジャンルで漫画を検索
    * 
    * @param genre 検索するジャンル
    * @param cursor ページングカーソル情報
    * @param limit 一度に取得する件数
    * @returns PaginatedResponse<Manga> オブジェクト
    */
-  searchByGenre(genre: string, cursor: PagingCursor | null, limit: number = 20): Observable<PaginatedResponse<Manga>> {
-    // タグ検索の場合は代替APIを使用（ObjectIdの問題を回避するため）
-    if (genre) {
-      console.log('[MangaService] ジャンル検索を代替APIで実行:', genre);
-      return this.searchMangaWithTags(genre, cursor, limit);
+  searchByGenre(genre: string, cursor: PagingCursor | null = null, limit: number = 20): Observable<PaginatedResponse<Manga>> {
+    console.log('[MangaService] searchByGenre called with genre:', genre);
+    console.log('[MangaService] cursor:', cursor ? JSON.stringify(cursor) : 'null');
+    console.log('[MangaService] limit:', limit);
+    
+    // HTTPパラメータを構築
+    let params = new HttpParams()
+      .set('genre', genre)
+      .set('limit', limit.toString());
+    
+    // カーソル情報があれば追加（createSafeCursorを使わず直接文字列化）
+    if (cursor) {
+      if (cursor.lastId) {
+        params = params.set('lastId', String(cursor.lastId));
+        console.log('[MangaService] Adding lastId to params:', String(cursor.lastId));
+      }
+      if (cursor.lastUpdatedAt) {
+        params = params.set('lastUpdatedAt', String(cursor.lastUpdatedAt));
+        console.log('[MangaService] Adding lastUpdatedAt to params:', String(cursor.lastUpdatedAt));
+      }
     }
     
-    let params = new HttpParams().set('limit', limit.toString());
-    
-    if (genre) {
-      params = params.set('genre', genre);
-    }
-    
-    // 安全なカーソル情報を作成
-    const safeCursor = this.createSafeCursor(cursor);
-    
-    // カーソル情報がある場合のみパラメータを追加
-    if (safeCursor && safeCursor.lastId && safeCursor.lastUpdatedAt) {
-      // 型に関係なく常に文字列として扱う
-      params = params.set('lastId', safeCursor.lastId);
-      params = params.set('lastUpdatedAt', safeCursor.lastUpdatedAt);
-      
-      console.log('[MangaService] ジャンル検索カーソル情報:', {
-        lastIdType: typeof safeCursor.lastId,
-        lastUpdatedAtType: typeof safeCursor.lastUpdatedAt,
-        lastId: safeCursor.lastId,
-        lastUpdatedAt: safeCursor.lastUpdatedAt
-      });
-    }
-    
-    console.log('[MangaService] ジャンル検索リクエストパラメータ:', params.toString());
-    
+    console.log('[MangaService] Final params for genre search:', params.toString());
+
+    // APIリクエストを送信
     return this.http.get<PaginatedResponse<Manga>>(`${this.API_BASE_URL}/api/manga/searchByGenre`, { params })
       .pipe(
-        tap(response => {
-          console.log('[MangaService] ジャンル検索レスポンス:', response);
-        }),
+        tap(rawResponse => console.log('[MangaService] Raw genre search response:', rawResponse)),
         map(response => {
-          // レスポンスの中身をチェック
+          // レスポンスからデータをマッピング
           if (!response || !response.data) {
-            console.warn('[MangaService] 不適切なレスポンス形式:', response);
+            console.log('[MangaService] Empty response received');
             return {
               data: [],
-              nextCursor: { lastId: '', lastUpdatedAt: '' },
-              hasMore: false
-            };
+              hasMore: false,
+              nextCursor: null
+            } as PaginatedResponse<Manga>;
           }
           
-          // データがあれば適切に変換
-          const mappedData = response.data.map(item => ({
+          // データをマッピング
+          const mappedData = response.data.map((item: any) => ({
             fanzaId: item.fanzaId,
             title: item.title,
             author: item.author,
@@ -356,124 +320,46 @@ export class MangaService {
             createdAt: new Date(item.createdAt),
             updatedAt: new Date(item.updatedAt)
           } as Manga));
-
-          // nextCursorを安全に処理
-          let safeNextCursor = { lastId: '', lastUpdatedAt: '' };
+          
+          // 次ページカーソル情報をマッピング
+          let nextCursor: PagingCursor | null = null;
           if (response.nextCursor) {
-            safeNextCursor = {
+            nextCursor = {
               lastId: String(response.nextCursor.lastId || ''),
               lastUpdatedAt: String(response.nextCursor.lastUpdatedAt || '')
             };
+            console.log('[MangaService] Next cursor from response:', JSON.stringify(nextCursor));
           }
           
-          return {
+          // マッピングしたレスポンスを返す
+          const mappedResponse = {
             data: mappedData,
-            nextCursor: safeNextCursor,
+            nextCursor: nextCursor,
             hasMore: response.hasMore || false
           };
+          
+          console.log('[MangaService] Genre search response mapped:', {
+            dataCount: mappedResponse.data.length,
+            hasNextCursor: !!mappedResponse.nextCursor,
+            hasMore: mappedResponse.hasMore
+          });
+          
+          if (mappedData.length > 0) {
+            console.log('[MangaService] First manga:', mappedData[0].fanzaId);
+            console.log('[MangaService] Last manga:', mappedData[mappedData.length-1].fanzaId);
+          }
+          
+          return mappedResponse;
         }),
         catchError(error => {
-          console.error('[MangaService] ジャンル検索エラー:', error);
-          // エラーが発生した場合は代替APIを使用
-          console.log('[MangaService] エラーが発生したため代替APIを使用します');
-          return this.searchMangaWithTags(genre, cursor, limit);
+          console.error('[MangaService] Genre search error:', error);
+          return of({
+            data: [],
+            hasMore: false,
+            nextCursor: null
+          } as PaginatedResponse<Manga>);
         })
       );
-  }
-  
-  /**
-   * タグ検索のための代替メソッド
-   * ObjectIdの問題を回避するため通常の検索APIを使用
-   * 
-   * @param tags タグ（カンマ区切り）
-   * @param cursor ページングカーソル情報
-   * @param limit 一度に取得する件数
-   * @returns PaginatedResponse<Manga> オブジェクト
-   */
-  private searchMangaWithTags(tags: string, cursor: PagingCursor | null, limit: number = 20): Observable<PaginatedResponse<Manga>> {
-    console.log('[MangaService] タグ検索代替APIを使用:', tags);
-    
-    let params = new HttpParams()
-      .set('limit', limit.toString());
-    
-    // タグをクエリパラメータとして追加
-    params = params.set('tags', tags);
-    
-    // 安全なカーソル情報を作成
-    const safeCursor = this.createSafeCursor(cursor);
-    
-    // カーソル情報がある場合は追加
-    if (safeCursor && safeCursor.lastId && safeCursor.lastUpdatedAt) {
-      // 文字列として確実に送信
-      params = params
-        .set('lastId', safeCursor.lastId)
-        .set('lastUpdatedAt', safeCursor.lastUpdatedAt);
-      
-      console.log('[MangaService] タグ検索カーソル情報:', {
-        lastIdType: typeof safeCursor.lastId,
-        lastUpdatedAtType: typeof safeCursor.lastUpdatedAt,
-        lastId: safeCursor.lastId,
-        lastUpdatedAt: safeCursor.lastUpdatedAt
-      });
-    }
-    
-    console.log('[MangaService] タグ検索APIリクエスト:', `${this.API_BASE_URL}/api/manga/search`);
-    
-    // 通常の検索APIを使用（ObjectId問題を回避するため）
-    return this.http.get<PaginatedResponse<any>>(`${this.API_BASE_URL}/api/manga/search`, { params }).pipe(
-      tap(response => {
-        console.log('[MangaService] タグ検索結果受信:', response);
-      }),
-      map((response) => {
-        if (!response || !response.data || !Array.isArray(response.data)) {
-          console.warn('[MangaService] タグ検索レスポンスデータが適切な形式ではありません:', response);
-          return {
-            data: [],
-            nextCursor: { lastId: '', lastUpdatedAt: '' },
-            hasMore: false
-          };
-        }
-
-        // データを適切な形式にマッピング
-        const mappedData = response.data.map(item => ({
-          fanzaId: item.fanzaId,
-          title: item.title,
-          author: item.author,
-          price: item.price,
-          thumbnailUrl: item.thumbnailUrl,
-          tags: item.tags,
-          description: item.description,
-          affiliateUrl: item.affiliateUrl,
-          tachiyomiUrl: item.tachiyomiUrl,
-          sampleImageUrls: item.sampleImageUrls,
-          createdAt: new Date(item.createdAt),
-          updatedAt: new Date(item.updatedAt)
-        } as Manga));
-
-        // nextCursorも文字列型として安全に扱う
-        let safeNextCursor = { lastId: '', lastUpdatedAt: '' };
-        if (response.nextCursor) {
-          safeNextCursor = {
-            lastId: String(response.nextCursor.lastId || ''),
-            lastUpdatedAt: String(response.nextCursor.lastUpdatedAt || '')
-          };
-        }
-
-        return {
-          data: mappedData,
-          nextCursor: safeNextCursor,
-          hasMore: response.hasMore || false
-        };
-      }),
-      catchError(error => {
-        console.error('[MangaService] タグ検索エラー発生:', error);
-        return of({
-          data: [],
-          nextCursor: { lastId: '', lastUpdatedAt: '' },
-          hasMore: false
-        });
-      })
-    );
   }
 
   /**
@@ -482,15 +368,8 @@ export class MangaService {
    * @returns ジャンルと作品数の配列
    */
   getGenreCounts(): Observable<{genre: string, count: number}[]> {
-    console.log('[MangaService] ジャンル一覧取得リクエスト');
-    console.log('[MangaService] APIリクエスト:', `${this.API_BASE_URL}/api/manga/genres`);
-    
     return this.http.get<{genre: string, count: number}[]>(`${this.API_BASE_URL}/api/manga/genres`).pipe(
-      tap(response => {
-        console.log('[MangaService] ジャンル一覧レスポンス:', response);
-      }),
       catchError(error => {
-        console.error('[MangaService] ジャンル一覧取得エラー:', error);
         return of([]);
       })
     );
@@ -503,14 +382,9 @@ export class MangaService {
    * @returns 漫画データのObservable
    */
   getMangaById(id: string): Observable<Manga> {
-    console.log(`[MangaService] ID:${id}の漫画データを取得リクエスト`);
-    console.log('[MangaService] APIリクエスト:', `${this.API_BASE_URL}/api/manga/${id}`);
-
     return this.http.get<Manga>(`${this.API_BASE_URL}/api/manga/${id}`).pipe(
-      tap(data => console.log(`[MangaService] ID:${id}の漫画データを取得:`, data)),
       map(item => {
         if (!item || !item.fanzaId) {
-          console.warn(`[MangaService] ID:${id}の漫画データが不完全です:`, item);
           throw new Error('漫画データが見つかりませんでした');
         }
         return {
@@ -529,8 +403,6 @@ export class MangaService {
         } as Manga;
       }),
       catchError(error => {
-        console.error(`[MangaService] ID:${id}の漫画データ取得エラー:`, error);
-        // エラーを再スローして上位コンポーネントで適切に処理できるようにする
         return throwError(() => new Error('漫画データの取得に失敗しました。サーバーが応答していないか、データが存在しません。'));
       })
     );
@@ -558,26 +430,13 @@ export class MangaService {
       // 文字列として確実に送信
       params = params.set('lastId', safeCursor.lastId);
       params = params.set('lastUpdatedAt', safeCursor.lastUpdatedAt);
-      
-      console.log('[MangaService] 複合検索カーソル情報:', {
-        lastIdType: typeof safeCursor.lastId,
-        lastUpdatedAtType: typeof safeCursor.lastUpdatedAt,
-        lastId: safeCursor.lastId,
-        lastUpdatedAt: safeCursor.lastUpdatedAt
-      });
     }
-    
-    console.log('[MangaService] 複合検索リクエストパラメータ:', params.toString());
     
     return this.http.get<PaginatedResponse<Manga>>(`${this.API_BASE_URL}/api/manga/searchCombined`, { params })
       .pipe(
-        tap(response => {
-          console.log('[MangaService] 複合検索レスポンス:', response);
-        }),
         map(response => {
           // レスポンスの中身をチェック
           if (!response || !response.data) {
-            console.warn('[MangaService] 不適切なレスポンス形式:', response);
             return {
               data: [],
               nextCursor: { lastId: '', lastUpdatedAt: '' },
@@ -617,7 +476,6 @@ export class MangaService {
           };
         }),
         catchError(error => {
-          console.error('[MangaService] 複合検索エラー:', error);
           return of({
             data: [],
             nextCursor: { lastId: '', lastUpdatedAt: '' },
@@ -625,5 +483,45 @@ export class MangaService {
           });
         })
       );
+  }
+
+  // レスポンスのマッピング処理を共通化
+  private mapPaginatedResponse(response: any): PaginatedResponse<Manga> {
+    if (!response || !response.data) {
+      return {
+        data: [],
+        nextCursor: null,
+        hasMore: false
+      };
+    }
+    
+    const mappedData = response.data.map((item: any) => ({
+      fanzaId: item.fanzaId,
+      title: item.title,
+      author: item.author,
+      price: item.price,
+      thumbnailUrl: item.thumbnailUrl,
+      tags: item.tags,
+      description: item.description,
+      affiliateUrl: item.affiliateUrl,
+      tachiyomiUrl: item.tachiyomiUrl,
+      sampleImageUrls: item.sampleImageUrls,
+      createdAt: new Date(item.createdAt),
+      updatedAt: new Date(item.updatedAt)
+    } as Manga));
+    
+    let nextCursor: PagingCursor | null = null;
+    if (response.nextCursor) {
+      nextCursor = {
+        lastId: String(response.nextCursor.lastId || ''),
+        lastUpdatedAt: String(response.nextCursor.lastUpdatedAt || '')
+      };
+    }
+    
+    return {
+      data: mappedData,
+      nextCursor: nextCursor,
+      hasMore: response.hasMore || false
+    };
   }
 }

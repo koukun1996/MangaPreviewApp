@@ -1,0 +1,76 @@
+<div class="search-overlay" (click)="$event.stopPropagation()">
+  <!-- 検索入力エリア -->
+  <div class="search-wrapper" [class.visible]="true" (click)="$event.stopPropagation()">
+    <div class="search-container">
+      <input
+        type="text"
+        class="search-input"
+        [(ngModel)]="searchTerm"
+        (ngModelChange)="onSearchChange($event)"
+        placeholder="タイトル、作者、タグで検索..."
+        (keydown.escape)="hideSearch()"
+        (keydown.enter)="executeSearch()"
+        autofocus
+      />
+    </div>
+    
+    <!-- ジャンル選択部分を検索欄の下に配置 -->
+    <div class="genre-selection">
+      <div class="genre-header">
+        <h3>ジャンルで絞り込み</h3>
+        <div class="genre-toggle" (click)="toggleGenreList()" *ngIf="isMobileDevice">
+          <span>{{ isGenreListVisible ? '隠す' : '表示' }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [style.transform]="isGenreListVisible ? 'rotate(180deg)' : 'rotate(0deg)'">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- 検索ボタンをジャンル選択ヘッダーの下に配置して固定 -->
+      <div class="search-button-container">
+        <button class="search-button" (click)="executeSearch(); $event.stopPropagation();">
+          検索する
+        </button>
+      </div>
+      
+      <!-- ジャンルリストをスクロール可能に -->
+      <div class="genre-list-scroll-container" [class.visible]="isGenreListVisible || !isMobileDevice">
+        <div class="genre-list-container">
+          <div class="selected-genre" *ngIf="selectedGenres.length > 0">
+            <div class="selected-genres-header">
+              <span>選択中のジャンル: {{ selectedGenres.length }}件 (複数選択可能)</span>
+              <button class="clear-all-genres" (click)="clearAllGenres()">すべて解除</button>
+            </div>
+            <div class="selected-genres-container">
+              <div class="genre-badge" *ngFor="let genre of selectedGenres">
+                {{ genre }} <span class="clear-genre" (click)="selectGenre(genre)">×</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="genres-section-title" *ngIf="genres.length > 0">
+            利用可能なジャンル一覧 ({{ genres.length }}種類)
+          </div>
+          
+          <div class="genre-list">
+            <div 
+              *ngFor="let genre of genres" 
+              class="genre-tag" 
+              [class.active]="genre.active"
+              (click)="selectGenre(genre.genre)"
+            >
+              <span class="genre-name">{{ genre.genre }}</span>
+              <span class="genre-count">({{ genre.count }})</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ローディング表示 -->
+<div *ngIf="isLoading" class="loading-container">
+  <div class="loading-spinner"></div>
+  <p>検索中...</p>
+</div>

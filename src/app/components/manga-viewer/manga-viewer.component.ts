@@ -1,13 +1,14 @@
-import { Component, OnInit, HostListener, PLATFORM_ID, Inject, AfterViewInit, OnDestroy, ChangeDetectorRef } from "@angular/core";
+import { Component, OnInit, HostListener, PLATFORM_ID, Inject, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule, isPlatformBrowser, isPlatformServer } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { MangaService, PagingCursor, PaginatedResponse } from "../../services/manga.service";
 import { Manga } from "../../models/manga.interface";
-import { debounceTime, distinctUntilChanged, Subject } from "rxjs";
+import { debounceTime, distinctUntilChanged, Subject, takeUntil } from "rxjs";
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { AdultConfirmationDialogComponent } from "../AdultConfirmationDialogComponent/adult-confirmation-dialog.component";
 import { ActivatedRoute, Router } from '@angular/router';
 import { SeoService } from '../../services/seo.service';
+import { MangaSearchComponent, MangaSearchResultEvent } from '../manga-search/manga-search.component';
 
 interface GenreItem {
   genre: string;
@@ -18,7 +19,7 @@ interface GenreItem {
 @Component({
   selector: "app-manga-viewer",
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, AdultConfirmationDialogComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, AdultConfirmationDialogComponent, MangaSearchComponent],
   templateUrl: "./manga-viewer.component.html",
   styleUrls: ["./manga-viewer.component.scss", "../../../../src/custom-theme.scss"],
   styles: [`
@@ -90,8 +91,8 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   hasMorePages = true;
   
   searchTerm = "";
-  private searchSubject = new Subject<string>();
-  isLoading = false;
+  searchQuery = ""; // 検索クエリ用プロパティを追加
+  isLoading = true;
   isSearchVisible = false;
   currentImageIndex = 0;
   isAdult = true; // デフォルトで成人と想定
@@ -114,7 +115,6 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   isImageLoading = false;
 
   private lastScrollTop = 0;
-  private scrollTimeout: any;
   private headerTimeout: any;
   isHeaderVisible = true;
 
@@ -140,6 +140,32 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   // 検索結果モードを追加
   isSearchResultMode = false;
 
+  // ページネーション情報
+  pagination = {
+    hasNextPage: false,
+    hasPreviousPage: false
+  };
+
+  private destroy$ = new Subject<void>();
+
+  @ViewChild('scrollObserver') scrollObserver: ElementRef | undefined;
+  private intersectionObserver: IntersectionObserver | undefined;
+
+  // 全体のリスト
+  allMangaList: Manga[] = [];
+  // 表示用リスト
+  displayMangaList: Manga[] = [];
+  // 現在のオフセット
+  currentOffset = 0;
+  // 1ページあたりの件数
+  readonly PAGE_SIZE = 20;
+
+  // クラスのプロパティに追加
+  displayGenre: string = ''; // 表示用のジャンル名
+
+  // ジャンル検索モードフラグを追加
+  isGenreSearchMode = false;
+
   constructor(
     private mangaService: MangaService,
     public dialog: MatDialog,
@@ -150,15 +176,7 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     private seoService: SeoService
   ) {
     console.log('[DEBUG] MangaViewerComponent constructor called');
-    /* 検索ボタン対応のため、自動検索機能を無効化
-    this.searchSubject
-      .pipe(debounceTime(300), distinctUntilChanged())
-      .subscribe(term => {
-        if (term.trim() !== "") {
-          this.performSearch(term);
-        }
-      });
-    */
+    this.isMobileDevice = this.checkIfMobile();
   }
 
   ngOnInit(): void {
@@ -174,10 +192,12 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.route.params.subscribe(params => {
       if (params['id']) {
         this.mangaId = params['id'];
+        console.log('[DEBUG] Manga ID from route:', this.mangaId);
         if (this.mangaId) {
           this.loadMangaData(this.mangaId);
         }
       } else {
+        console.log('[DEBUG] No manga ID in route, loading latest manga');
         this.loadLatestManga();
       }
     });
@@ -213,6 +233,9 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
           this.showCustomAdultConfirmation();
         }, 500);
       }
+      
+      // 無限スクロール用のインターセクションオブザーバーを設定
+      this.setupIntersectionObserver();
     }
   }
 
@@ -226,6 +249,27 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
       document.removeEventListener('touchstart', this.onTouchStart.bind(this));
       document.removeEventListener('touchend', this.onTouchEnd.bind(this));
     }
+    
+    // インターセクションオブザーバーを解除
+    if (this.intersectionObserver) {
+      this.intersectionObserver.disconnect();
+    }
+
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  @HostListener('window:resize', ['$event'])
+  onResize() {
+    this.isMobileDevice = this.checkIfMobile();
+  }
+
+  private checkIfMobile(): boolean {
+    if (isPlatformBrowser(this.platformId)) {
+      return window.innerWidth <= 768;
+    }
+    // SSRの場合はデフォルトでfalseを返す
+    return false;
   }
 
   // カスタムダイアログを表示
@@ -236,148 +280,24 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // 検索の表示/非表示を切り替え
   toggleSearch() {
-    // すでに表示されている場合は非表示にする
-    if (this.isSearchVisible) {
-      this.isSearchVisible = false;
-      this.isGenreListVisible = false;
-    } else {
-      // 非表示の場合は表示する
-      this.isSearchVisible = true;
-      // PC版では自動的にジャンルリストも表示
-      this.isGenreListVisible = !this.isMobileDevice;
+    console.log('[DEBUG] Toggle search');
+    this.isSearchVisible = !this.isSearchVisible;
+    
+    if (this.isSearchVisible && isPlatformBrowser(this.platformId)) {
+      // 少し遅延させてから検索入力欄にフォーカスする
+      setTimeout(() => {
+        const searchInput = document.querySelector('.search-input') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 100);
     }
   }
-
-  // 検索を隠す
+  
+  // 検索を非表示にする
   hideSearch() {
-    // 全てのデバイスで検索オーバーレイを閉じる
+    console.log('[DEBUG] Hide search');
     this.isSearchVisible = false;
-    this.isGenreListVisible = false;
-  }
-
-  // 検索入力時の処理
-  onSearchInput(event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    this.searchSubject.next(value);
-  }
-
-  // 検索の変更を処理
-  onSearchChange(value: string) {
-    console.log('[Client] 検索語を変更:', value);
-    // キーワードの変更を記録するのみで、検索は実行しない
-    this.searchTerm = value;
-  }
-
-  // 検索の実行
-  public performSearch(term: string) {
-    console.log('[Client] 検索を実行:', term);
-    this.isLoading = true;
-    this.isImageLoading = true;
-    
-    // カーソル情報をリセット
-    this.currentCursor = null;
-    this.nextCursor = null;
-    this.cursorHistory = [];
-    
-    this.mangaService.searchManga(term).subscribe({
-      next: (response) => {
-        console.log('[Client] 検索結果:', response);
-        this.mangaList = response.data || [];
-        this.hasMorePages = response.hasMore;
-        this.nextCursor = response.nextCursor;
-        
-        this.logCurrentStateDebug('[キーワード検索結果受信後]');
-        
-        if (this.mangaList.length > 0) {
-          this.currentIndex = 0;
-          // 一度nullにして確実に更新を発生させる
-          this.currentManga = null;
-          this.cdr.detectChanges(); // 変更を即時反映
-          
-          // 非同期で状態を更新してchangeDetectionを確実に発生させる
-          setTimeout(() => {
-            this.currentManga = {...this.mangaList[0]};  // オブジェクトを複製して新しい参照を作成
-            this.currentImageIndex = 0;
-            console.log('[Client] 検索で作品を表示:', this.currentManga?.title);
-            this.preloadImages();
-            this.isLoading = false;
-            this.isImageLoading = false;
-            this.cdr.detectChanges(); // 変更を即時反映
-            this.logCurrentStateDebug('[キーワード検索結果表示完了]');
-          }, 50);
-        } else {
-          this.currentManga = null;
-          console.log('[Client] 検索で作品が見つかりませんでした');
-          this.isLoading = false;
-          this.isImageLoading = false;
-          this.cdr.detectChanges(); // 変更を即時反映
-          this.logCurrentStateDebug('[キーワード検索結果なし]');
-        }
-      },
-      error: (error) => {
-        this.mangaList = [];
-        this.currentManga = null;
-        this.handleError(error, '検索');
-        this.isLoading = false;
-        this.isImageLoading = false;
-        this.cdr.detectChanges(); // 変更を即時反映
-        this.logCurrentStateDebug('[キーワード検索エラー]');
-      }
-    });
-  }
-
-  // キーワードとジャンルを組み合わせた検索
-  private performCombinedSearch(term: string, genres: string) {
-    console.log(`[Client] 複合検索を実行: キーワード=${term}, ジャンル=${genres}`);
-    
-    this.isLoading = true;
-    this.isImageLoading = true;
-    
-    // カーソル情報をリセット
-    this.currentCursor = null;
-    this.nextCursor = null;
-    this.cursorHistory = [];
-    
-    this.mangaService.searchCombined(term, genres, null).subscribe({
-      next: (response: PaginatedResponse<Manga>) => {
-        console.log('[Client] 複合検索結果:', response);
-        this.mangaList = response.data || [];
-        this.hasMorePages = response.hasMore;
-        this.nextCursor = response.nextCursor;
-        
-        if (this.mangaList.length > 0) {
-          this.currentIndex = 0;
-          // 一度nullにして確実に更新を発生させる
-          this.currentManga = null;
-          this.cdr.detectChanges(); // 変更を即時反映
-          
-          // 非同期で状態を更新してchangeDetectionを確実に発生させる
-          setTimeout(() => {
-            this.currentManga = {...this.mangaList[0]};  // オブジェクトを複製して新しい参照を作成
-            this.currentImageIndex = 0;
-            console.log('[Client] 複合検索で見つかった作品を表示:', this.currentManga?.title);
-            this.preloadImages();
-            this.isLoading = false;
-            this.isImageLoading = false;
-            this.cdr.detectChanges(); // 変更を即時反映
-          }, 50);
-        } else {
-          this.currentManga = null;
-          console.log('[Client] 複合検索で作品が見つかりませんでした');
-          this.isLoading = false;
-          this.isImageLoading = false;
-          this.cdr.detectChanges(); // 変更を即時反映
-        }
-      },
-      error: (error) => {
-        console.error('[Client] 複合検索エラー:', error);
-        this.handleError(error, '複合検索中');
-        this.isLoading = false;
-        this.isImageLoading = false;
-        this.currentManga = null;
-        this.cdr.detectChanges(); // 変更を即時反映
-      }
-    });
   }
 
   // 検索ボタンクリック時の処理
@@ -390,6 +310,9 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     // 検索結果モードに切り替える
     this.isSearchResultMode = true;
     
+    // 検索クエリを保存
+    this.searchQuery = this.searchTerm.trim();
+    
     // Reset pagination
     this.currentCursor = null;
     this.nextCursor = null;
@@ -399,45 +322,58 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mangaList = [];
     
     // If search term is provided, perform search
-    if (this.searchTerm.trim() || this.selectedGenres.length > 0) {
-      // Search by tags/genres and term
-      if (this.selectedGenres.length > 0) {
-        this.searchBySelectedGenres();
-      } else {
-        // Only search term - use normal search
-        this.performSearch(this.searchTerm);
-      }
+    if (this.searchTerm.trim() && this.selectedGenres.length > 0) {
+      // 複合検索
+      const genresParam = this.selectedGenres.join(',');
+      this.mangaService.searchCombined(this.searchTerm, genresParam, null).subscribe({
+        next: (response) => this.handlePaginatedResponse(response),
+        error: (error) => this.handleError(error, '検索中')
+      });
+    } else if (this.selectedGenres.length > 0) {
+      // ジャンルのみの検索
+      this.searchBySelectedGenres();
+    } else if (this.searchTerm.trim()) {
+      // キーワードのみの検索
+      this.mangaService.searchManga(this.searchTerm, null).subscribe({
+        next: (response) => this.handlePaginatedResponse(response),
+        error: (error) => this.handleError(error, '検索中')
+      });
     } else {
-      // No search term or genres, load default manga list
+      // No criteria provided - load default list
       this.loadManga();
     }
   }
 
-  // 検索結果モードを終了し、通常表示モードに戻る
+  // 検索結果モードを終了
   exitSearchResultMode() {
+    console.log('[DEBUG] Exit search result mode');
     this.isSearchResultMode = false;
     
     // 最初の漫画を表示
     if (this.mangaList.length > 0) {
       this.currentIndex = 0;
-      this.updateCurrentManga(this.mangaList[this.currentIndex]);
+      this.updateCurrentManga(this.mangaList[0]);
     }
   }
   
-  // 検索結果から漫画を選択して通常表示モードに戻る
-  selectMangaAndExit(manga: Manga) {
+  // 検索結果から漫画を選択して通常モードに戻る
+  selectMangaAndExit(manga: Manga, index: number): void {
+    console.log('[DEBUG] Selecting manga and exiting search mode:', manga.title);
+    // 現在のマンガをセット
+    this.currentManga = manga;
+    this.currentIndex = index;
+    this.mangaList = [...this.allMangaList]; // 選択時に全体リストをmangaListにコピー
+    
+    // 検索結果モードを終了
     this.isSearchResultMode = false;
     
-    // 選択された漫画のインデックスを見つける
-    const index = this.mangaList.findIndex(m => m.fanzaId === manga.fanzaId);
-    if (index !== -1) {
-      this.currentIndex = index;
-      this.updateCurrentManga(manga);
-    } else {
-      // 万が一見つからない場合
-      this.currentIndex = 0;
-      this.updateCurrentManga(this.mangaList[0]);
-    }
+    // UIの更新を強制
+    this.cdr.detectChanges();
+    
+    // 画像インデックスをリセット
+    this.currentImageIndex = 0;
+    
+    console.log('[DEBUG] Selected manga:', this.currentManga);
   }
   
   // 通常ロードとジャンル検索用の共通メソッド
@@ -518,10 +454,34 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ページ内の漫画を順次表示。末尾の場合は次ページを取得
   nextManga() {
+    console.log('[DEBUG] nextManga called, currentIndex=', this.currentIndex, 'mangaList.length=', this.mangaList.length);
+    
+    // データをロード中の場合は処理しない
+    if (this.isLoading || this.isLoadingMore) {
+      console.log('[DEBUG] Loading in progress, skipping nextManga call');
+      return;
+    }
+    
     if (this.currentIndex < this.mangaList.length - 1) {
+      // まだリスト内に次の漫画がある場合
       this.currentIndex++;
       this.updateCurrentManga(this.mangaList[this.currentIndex]);
     } else if (this.hasMorePages && this.nextCursor) {
+      // 次のページがあればロード
+      console.log('[DEBUG] Reached end of current manga list, fetching next page with cursor:', 
+        this.nextCursor ? JSON.stringify(this.nextCursor) : 'null');
+      
+      // フラグを設定してフェッチ中を示す
+      this.isLoading = true;
+      
+      // カーソル情報の整合性チェック
+      if (this.nextCursor && (!this.nextCursor.lastId || !this.nextCursor.lastUpdatedAt)) {
+        console.warn('[DEBUG] Next cursor has missing properties:', this.nextCursor);
+        // 最低限の情報を設定
+        if (!this.nextCursor.lastId) this.nextCursor.lastId = '';
+        if (!this.nextCursor.lastUpdatedAt) this.nextCursor.lastUpdatedAt = '';
+      }
+      
       this.fetchNextPage();
     } else {
       console.log('[Client] これ以上の漫画はありません');
@@ -530,156 +490,153 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ページ内の漫画を逆順で表示。先頭の場合は前ページを取得
   previousManga() {
+    console.log('[DEBUG] previousManga called, currentIndex=', this.currentIndex, 'cursorHistory.length=', this.cursorHistory.length);
     if (this.currentIndex > 0) {
       this.currentIndex--;
       this.updateCurrentManga(this.mangaList[this.currentIndex]);
     } else if (this.cursorHistory.length > 0) {
-      this.fetchPreviousPage();
+      this.previousPage();
     } else {
       console.log('[Client] 最初の漫画です');
     }
   }
 
-  // サーバーへ「次へ」指示。カーソルベースのページング
-  fetchNextPage() {
-    if (!this.hasMorePages || this.isLoading || this.isLoadingMore) {
-      console.log('[DEBUG] Cannot fetch next page: hasMorePages=', this.hasMorePages, 
-                  'isLoading=', this.isLoading, 'isLoadingMore=', this.isLoadingMore);
+  /**
+   * 次のページのデータを取得
+   */
+  private fetchNextPage(): void {
+    console.log('[MangaViewer] fetchNextPage called');
+    
+    // データ読み込み中の場合は処理しない
+    if (this.isLoadingMore) {
+      console.log('[MangaViewer] Already loading more data, skipping fetch');
       return;
     }
     
-    if (!this.nextCursor || !this.nextCursor.lastId) {
-      console.error('[DEBUG] Next cursor is invalid:', this.nextCursor);
-      return;
-    }
-    
-    console.log('[DEBUG] Fetching next page with cursor:', this.nextCursor);
-    
-    // 現在のカーソルをヒストリーに保存（確実に新しいオブジェクトとして）
-    if (this.currentCursor && this.currentCursor.lastId) {
-      this.cursorHistory.push({
-        lastId: String(this.currentCursor.lastId || ''),
-        lastUpdatedAt: String(this.currentCursor.lastUpdatedAt || '')
-      });
-    }
-    
+    // 読み込み中フラグを設定
     this.isLoadingMore = true;
     
-    // 現在の検索条件によって適切なAPIコールを使用
-    if (this.selectedGenres.length > 0) {
-      // ジャンル検索の続き
-      const genresParam = this.selectedGenres.join(',');
-      this.mangaService.searchByGenre(genresParam, this.nextCursor, 20).subscribe({
-        next: (response) => {
-          console.log('[DEBUG] Next page genre search results:', response);
-          this.handlePaginatedResponse(response);
-        },
-        error: (error) => {
-          console.error('[ERROR] Failed to fetch next page for genre search:', error);
-          this.isLoadingMore = false;
-        }
-      });
-    } else if (this.searchTerm) {
-      // キーワード検索の続き
-      this.mangaService.searchManga(this.searchTerm, this.nextCursor).subscribe({
-        next: (response) => {
-          console.log('[DEBUG] Next page search results:', response);
-          this.handlePaginatedResponse(response);
-        },
-        error: (error) => {
-          console.error('[ERROR] Failed to fetch next page for keyword search:', error);
-          this.isLoadingMore = false;
-        }
-      });
+    // カーソル情報のディープコピーを作成（必ず新しいオブジェクトを作成）
+    const cursorToSend = this.nextCursor ? JSON.parse(JSON.stringify(this.nextCursor)) : null;
+    console.log('[MangaViewer] Fetching next page with cursor:', cursorToSend ? JSON.stringify(cursorToSend) : 'null');
+    
+    // カーソル情報が不完全な場合は空のカーソルを使用する
+    if (cursorToSend && (!cursorToSend.lastId || !cursorToSend.lastUpdatedAt)) {
+      console.warn('[MangaViewer] Cursor information is incomplete. Creating empty cursor.');
+      // 空文字列でもカーソル情報を作成しておく
+      cursorToSend.lastId = cursorToSend.lastId || '';
+      cursorToSend.lastUpdatedAt = cursorToSend.lastUpdatedAt || '';
+    }
+    
+    // ジャンル検索モードの場合
+    if (this.isGenreSearchMode) {
+      console.log('[MangaViewer] Fetching next page in genre search mode');
+      console.log('[MangaViewer] Selected genres:', this.selectedGenres);
+      
+      // 選択されたジャンルがない場合は全ジャンル
+      if (!this.selectedGenres || this.selectedGenres.length === 0) {
+        console.log('[MangaViewer] No genres selected, using "全ジャンル"');
+        this.mangaService.searchByGenre('全ジャンル', cursorToSend, 20)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe({
+            next: (response) => {
+              console.log('[MangaViewer] Got response for all genres search - data count:', response.data?.length || 0);
+              this.handlePaginatedResponse(response);
+            },
+            error: (error) => {
+              console.error('[MangaViewer] Error fetching next page for all genres:', error);
+              this.isLoadingMore = false;
+              this.cdr.detectChanges();
+            }
+          });
+      } else {
+        // 複数ジャンル選択サポート（最初のジャンルのみ使用）
+        const primaryGenre = this.selectedGenres[0];
+        console.log('[MangaViewer] Using primary genre for search:', primaryGenre);
+        
+        this.mangaService.searchByGenre(primaryGenre, cursorToSend, 20)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe({
+            next: (response) => {
+              console.log('[MangaViewer] Got response for genre search - data count:', response.data?.length || 0);
+              this.handlePaginatedResponse(response);
+            },
+            error: (error) => {
+              console.error('[MangaViewer] Error fetching next page for genre:', error);
+              this.isLoadingMore = false;
+              this.cdr.detectChanges();
+            }
+          });
+      }
+    } else if (this.isSearchResultMode) {
+      // 検索結果モードの場合
+      console.log('[MangaViewer] Fetching next page in search result mode');
+      console.log('[MangaViewer] Current search query:', this.searchQuery);
+      
+      // 検索モードでジャンルも選択されている場合は複合検索を実行
+      if (this.selectedGenres && this.selectedGenres.length > 0) {
+        console.log('[MangaViewer] Combined search with genres and query');
+        const genresParam = this.selectedGenres.join(',');
+        
+        this.mangaService.searchCombined(this.searchQuery, genresParam, cursorToSend, 20)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe({
+            next: (response) => {
+              console.log('[MangaViewer] Got response for combined search - data count:', response.data?.length || 0);
+              this.handlePaginatedResponse(response);
+              this.logResponseData(response);
+            },
+            error: (error) => {
+              console.error('[MangaViewer] Error fetching next page for combined search:', error);
+              this.isLoadingMore = false;
+              this.cdr.detectChanges();
+            }
+          });
+      } else {
+        // キーワード検索のみの場合
+        this.mangaService.searchManga(this.searchQuery, cursorToSend, 20)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe({
+            next: (response) => {
+              console.log('[MangaViewer] Got response for keyword search - data count:', response.data?.length || 0);
+              this.handlePaginatedResponse(response);
+              this.logResponseData(response);
+            },
+            error: (error) => {
+              console.error('[MangaViewer] Error fetching next page for search:', error);
+              this.isLoadingMore = false;
+              this.cdr.detectChanges();
+            }
+          });
+      }
     } else {
-      // 通常の漫画リストの続き
-      this.mangaService.searchManga('', this.nextCursor).subscribe({
-        next: (response) => {
-          console.log('[DEBUG] Next page manga results:', response);
-          this.handlePaginatedResponse(response);
-        },
-        error: (error) => {
-          console.error('[ERROR] Failed to fetch next page for default manga list:', error);
-          this.isLoadingMore = false;
-        }
-      });
-    }
-  }
-
-  // サーバーへ「前へ」指示。カーソルベースのページング
-  fetchPreviousPage() {
-    if (this.cursorHistory.length === 0 || this.isLoading || this.isLoadingMore) {
-      console.log('[DEBUG] Cannot fetch previous page: history length=', this.cursorHistory.length, 
-                  'isLoading=', this.isLoading, 'isLoadingMore=', this.isLoadingMore);
-      return;
-    }
-    
-    // 履歴から最後のカーソルを取得（新しいオブジェクトとして）
-    const previousCursor = this.cursorHistory.pop();
-    if (!previousCursor) {
-      console.log('[DEBUG] No previous cursor available');
-      return;
-    }
-    
-    // 安全なカーソルオブジェクトを作成
-    const safePreviousCursor = {
-      lastId: String(previousCursor.lastId || ''),
-      lastUpdatedAt: String(previousCursor.lastUpdatedAt || '')
-    };
-    
-    console.log('[DEBUG] Fetching previous page with cursor:', safePreviousCursor);
-    
-    this.isLoadingMore = true;
-    
-    if (this.selectedGenres.length > 0) {
-      // ジャンル検索の前のページ
-      const genresParam = this.selectedGenres.join(',');
-      this.mangaService.searchByGenre(genresParam, safePreviousCursor, 20).subscribe({
-        next: (response) => {
-          console.log('[DEBUG] Previous page genre search results:', response);
-          this.handlePaginatedResponse(response, true);
-        },
-        error: (error) => {
-          console.error('[ERROR] Failed to fetch previous page for genre search:', error);
-          this.isLoadingMore = false;
-          // エラー時は履歴を元に戻す
-          if (previousCursor) {
-            this.cursorHistory.push({...previousCursor});
+      // 通常モード（おすすめ）の場合
+      console.log('[MangaViewer] Fetching next page in recommendation mode');
+      
+      // レコメンデーションAPIにはカーソル情報以外のパラメータも必要
+      const emptyArrays: string[] = [];
+      
+      this.mangaService.getRecommendations(
+        emptyArrays, // genres
+        emptyArrays, // tags
+        emptyArrays, // authors
+        emptyArrays, // excludeIds
+        cursorToSend, // cursor
+        20 // limit
+      )
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (response) => {
+            console.log('[MangaViewer] Got response for recommendations - data count:', response.data?.length || 0);
+            this.handlePaginatedResponse(response);
+            this.logResponseData(response);
+          },
+          error: (error) => {
+            console.error('[MangaViewer] Error fetching next page for recommendations:', error);
+            this.isLoadingMore = false;
+            this.cdr.detectChanges();
           }
-        }
-      });
-    } else if (this.searchTerm) {
-      // キーワード検索の前のページ
-      this.mangaService.searchManga(this.searchTerm, safePreviousCursor).subscribe({
-        next: (response) => {
-          console.log('[DEBUG] Previous page search results:', response);
-          this.handlePaginatedResponse(response, true);
-        },
-        error: (error) => {
-          console.error('[ERROR] Failed to fetch previous page for keyword search:', error);
-          this.isLoadingMore = false;
-          // エラー時は履歴を元に戻す
-          if (previousCursor) {
-            this.cursorHistory.push({...previousCursor});
-          }
-        }
-      });
-    } else {
-      // 通常の漫画リストの前のページ
-      this.mangaService.searchManga('', safePreviousCursor).subscribe({
-        next: (response) => {
-          console.log('[DEBUG] Previous page manga results:', response);
-          this.handlePaginatedResponse(response, true);
-        },
-        error: (error) => {
-          console.error('[ERROR] Failed to fetch previous page for default manga list:', error);
-          this.isLoadingMore = false;
-          // エラー時は履歴を元に戻す
-          if (previousCursor) {
-            this.cursorHistory.push({...previousCursor});
-          }
-        }
-      });
+        });
     }
   }
 
@@ -699,17 +656,33 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   goToTachiyomi() {
+    console.log('[DEBUG] goToTachiyomi called');
     if (!isPlatformBrowser(this.platformId)) {
       console.log('[DEBUG] Not in browser environment');
       return;
     }
     
-    console.log('[DEBUG] Current Manga:', JSON.stringify(this.currentManga, null, 2));
-    console.log('[DEBUG] Tachiyomi URL:', this.currentManga?.tachiyomiUrl);
-    if (this.currentManga?.tachiyomiUrl) {
-      window.open(this.currentManga.tachiyomiUrl, "_blank");
+    if (!this.currentManga) {
+      console.error('[ERROR] Cannot navigate to tachiyomi page: currentManga is null');
+      return;
+    }
+    
+    console.log('[DEBUG] Current Manga title:', this.currentManga.title);
+    console.log('[DEBUG] Tachiyomi URL:', this.currentManga.tachiyomiUrl);
+    
+    if (this.currentManga.tachiyomiUrl) {
+      // IEやEdgeなどの一部のブラウザ対策でtryブロックで囲む
+      try {
+        window.open(this.currentManga.tachiyomiUrl, "_blank", "noopener,noreferrer");
+        console.log('[DEBUG] Successfully opened tachiyomi URL in a new tab');
+      } catch (error) {
+        console.error('[ERROR] Failed to open tachiyomi URL:', error);
+        // フォールバック
+        window.location.href = this.currentManga.tachiyomiUrl;
+      }
     } else {
-      console.log('[DEBUG] tachiyomiUrl is not set');
+      console.error('[ERROR] tachiyomiUrl is not set for the current manga');
+      alert('この漫画の立ち読みページはありません。');
     }
   }
 
@@ -724,11 +697,26 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   getCurrentImage(): string {
-    if (!this.currentManga) return "";
-    if (this.currentImageIndex === 0) {
-      return this.currentManga.thumbnailUrl || "";
+    if (!this.currentManga) {
+      console.error('[ERROR] getCurrentImage: currentManga is null or undefined');
+      return "";
     }
-    return this.currentManga.sampleImageUrls?.[this.currentImageIndex - 1] || this.currentManga.thumbnailUrl || "";
+    
+    let imageUrl = "";
+    
+    if (this.currentImageIndex === 0) {
+      imageUrl = this.currentManga.thumbnailUrl || "";
+    } else {
+      const sampleImages = this.currentManga.sampleImageUrls || [];
+      if (this.currentImageIndex - 1 < sampleImages.length) {
+        imageUrl = sampleImages[this.currentImageIndex - 1];
+      } else {
+        imageUrl = this.currentManga.thumbnailUrl || "";
+      }
+    }
+    
+    console.log('[DEBUG] getCurrentImage returning URL:', imageUrl);
+    return imageUrl;
   }
 
   // タッチイベントリスナーを初期化
@@ -839,23 +827,12 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   // 漫画が変更されたときにプリロードを実行
   private updateCurrentManga(manga: Manga) {
     if (!manga) return;
-    
-    console.log('[Client] 漫画データを更新:', manga.title);
-    // 一度nullにして強制的に更新を発生させる
     this.currentManga = null;
-    this.isImageLoading = true;
-    this.cdr.detectChanges(); // 変更を即時反映
-    
-    // 非同期で状態を更新してchangeDetectionを確実に発生させる
+    this.cdr.detectChanges();
     setTimeout(() => {
-      // オブジェクトを新たに複製して参照を変更し、確実にAngularの変更検出が働くようにする
-      this.currentManga = {...manga};
-      this.currentImageIndex = 0;
-      this.preloadImages();
-      this.isImageLoading = false;
-      // 変更検出を明示的に実行
+      this.currentManga = { ...manga };
       this.cdr.detectChanges();
-      this.logCurrentStateDebug('[漫画データ更新完了]');
+      console.log('[MangaViewer] updateCurrentMangaでセット:', this.currentManga);
     }, 50);
   }
 
@@ -866,13 +843,10 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onImageError() {
-    console.error('[DEBUG] 画像の読み込みに失敗しました');
+    console.log('[DEBUG] Image loading error');
+    // 画像読み込みエラー時もローディング状態を解除
     this.isImageLoading = false;
-    
-    // フォールバック画像を表示
-    if (this.currentManga) {
-      this.currentManga.thumbnailUrl = "assets/error-image.png";
-    }
+    this.cdr.detectChanges();
   }
 
   private handleError(error: any, operation: string) {
@@ -986,6 +960,7 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // レコメンデーション漫画を取得
   getRecommendations() {
+    console.log('[DEBUG] getRecommendations called, currentManga=', this.currentManga?.title);
     this.isLoading = true;
     this.isImageLoading = true;
     console.log('[Client] レコメンデーション取得開始');
@@ -1109,45 +1084,50 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isLoading = true;
     this.isImageLoading = true;
     
+    // 検索結果モードに切り替える
+    this.isSearchResultMode = true;
+    
     // カーソル情報をリセット
     this.currentCursor = null;
     this.nextCursor = null;
     this.cursorHistory = [];
+    
+    // リストもリセット
+    this.allMangaList = [];
+    this.mangaList = [];
+    this.displayMangaList = [];
 
     // 複数ジャンルをカンマ区切りで送信
     const genresParam = this.selectedGenres.join(','); // 複数ジャンルをカンマ区切りに
     console.log('[Client] ジャンル検索を実行:', genresParam);
     
+    // limitを20に統一
     this.mangaService.searchByGenre(genresParam, null, 20).subscribe({
       next: (response: PaginatedResponse<Manga>) => {
         console.log('[Client] ジャンル検索結果:', response);
-        this.mangaList = response.data || [];
-        this.hasMorePages = response.hasMore;
-        this.nextCursor = response.nextCursor;
+        console.log('[DEBUG] ジャンル検索で取得したデータ数:', response.data?.length || 0);
         
-        if (this.mangaList.length > 0) {
-          this.currentIndex = 0;
-          // 一度nullにして確実に更新を発生させる
-          this.currentManga = null;
-          this.cdr.detectChanges(); // 変更を即時反映
-          
-          // 非同期で状態を更新してchangeDetectionを確実に発生させる
-          setTimeout(() => {
-            this.currentManga = {...this.mangaList[0]};  // オブジェクトを複製して新しい参照を作成
-            this.currentImageIndex = 0;
-            console.log('[Client] ジャンル検索で見つかった作品を表示:', this.currentManga?.title);
-            this.preloadImages();
-            this.isLoading = false;
-            this.isImageLoading = false;
-            this.cdr.detectChanges(); // 変更を即時反映
-          }, 50);
-        } else {
-          this.currentManga = null;
-          console.log('[Client] ジャンル検索で作品が見つかりませんでした');
-          this.isLoading = false;
-          this.isImageLoading = false;
-          this.cdr.detectChanges(); // 変更を即時反映
+        // データIDをログ出力して確認
+        if (response.data && response.data.length > 0) {
+          console.log('[DEBUG] 取得データの最初のID:', response.data[0].fanzaId);
+          console.log('[DEBUG] 取得データの最後のID:', response.data[response.data.length - 1].fanzaId);
         }
+        
+        // 次ページカーソル情報をログ出力
+        if (response.nextCursor) {
+          console.log('[DEBUG] 次ページカーソル情報:', JSON.stringify(response.nextCursor));
+        }
+        
+        // 検索結果を処理
+        this.handlePaginatedResponse(response);
+        
+        // 検索結果モードを設定（handlePaginatedResponseでは設定されない場合の対策）
+        setTimeout(() => {
+          if (this.mangaList.length > 0) {
+            this.isSearchResultMode = true;
+            this.cdr.detectChanges();
+          }
+        }, 100);
       },
       error: (error) => {
         console.error('[Client] ジャンル検索エラー:', error);
@@ -1217,6 +1197,11 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   initPagination(): void {
+    console.log('[DEBUG] Initializing pagination');
+    this.pagination = {
+      hasNextPage: false,
+      hasPreviousPage: false
+    };
     this.currentCursor = null;
     this.nextCursor = null;
     this.cursorHistory = [];
@@ -1239,8 +1224,22 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   searchByTag(tag: string): void {
-    this.searchTerm = tag;
+    console.log('[DEBUG] Searching by tag:', tag);
+    // タグを検索ワードにセット
+    this.searchTerm = '';
+    
+    // 選択されたタグをジャンルとして設定
+    this.selectedGenres = [tag];
+    
+    // ジャンルの表示状態を更新
+    this.genres.forEach(genre => {
+      genre.active = genre.genre === tag;
+    });
+    
+    // 検索を実行
     this.executeSearch();
+    
+    // モーダルを閉じる
     this.closeSelectedManga();
   }
 
@@ -1256,60 +1255,462 @@ export class MangaViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  // Helper method to handle paginated API responses
-  private handlePaginatedResponse(response: PaginatedResponse<Manga>, isPreviousPage: boolean = false) {
-    console.log('[DEBUG] Received paginated response:', response);
+  // 検索結果を処理するメソッド
+  handleSearchResults(event: MangaSearchResultEvent) {
+    console.log('[MangaViewer] handleSearchResults受信データ:', event);
+    console.log('[MangaViewer] event.results:', event.results);
+
+    // 検索語・ジャンルも親で同期
+    this.searchTerm = event.searchTerm;
+    this.selectedGenres = [...event.selectedGenres];
+
+    // 表示用のジャンル名を設定
+    if (this.selectedGenres.length > 0) {
+      this.displayGenre = this.selectedGenres.join('、');
+    } else if (this.searchTerm) {
+      this.displayGenre = `"${this.searchTerm}"`;
+    } else {
+      this.displayGenre = '全て';
+    }
+
+    // ローディング状態を解除
+    this.isLoading = false;
+    this.isSearchResultMode = true;
+    this.isSearchVisible = false;
+
+    // 検索結果の前にリストをクリア
+    this.allMangaList = [];
+    this.mangaList = [];
+    this.displayMangaList = [];
+    this.currentOffset = 0;
+
+    // 新着漫画にマークを付ける
+    event.results.forEach(manga => {
+      manga.isNew = this.isNewManga(manga);
+    });
+
+    // 検索結果のデータをセット（新しい参照で必ず上書き）
+    this.allMangaList = [...event.results];
+    this.mangaList = [...event.results];
+    this.displayMangaList = [...event.results];
+    console.log('[MangaViewer] mangaListセット:', this.allMangaList);
+
+    // ページネーション状態をAPIレスポンスから反映
+    this.nextCursor = event.nextCursor || null;
+    this.hasMorePages = !!event.hasMore;
+    console.log('[MangaViewer] ページネーション状態:', { 
+      nextCursor: this.nextCursor, 
+      hasMorePages: this.hasMorePages 
+    });
     
-    if (!response.data || !Array.isArray(response.data)) {
-      console.error('[ERROR] Invalid response format:', response);
-      this.isLoading = false;
-      this.isLoadingMore = false;
+    this.pagination = {
+      hasNextPage: !!event.hasMore,
+      hasPreviousPage: false
+    };
+
+    // 検索結果がある場合、現在の漫画を更新
+    if (this.displayMangaList.length > 0) {
+      this.currentManga = null;
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        // 検索結果の最初の漫画を選択状態にするが表示はしない
+        // 実際の表示はselectMangaAndExitメソッドで行う
+        this.currentIndex = 0;
+        this.cdr.detectChanges();
+        console.log('[MangaViewer] 現在の表示モード:', this.isSearchResultMode ? '検索結果モード' : '通常モード');
+        console.log('[MangaViewer] 現在選択中の漫画:', this.currentManga);
+      }, 0);
+    } else {
+      this.currentManga = null;
+      this.cdr.detectChanges();
+      console.log('[MangaViewer] 検索結果なし - 現在の漫画をクリア');
+    }
+
+    setTimeout(() => {
+      if (!this.isSearchResultMode) {
+        console.log('[MangaViewer] 検索結果モードが無効になっているため再設定');
+        this.isSearchResultMode = true;
+        this.cdr.detectChanges();
+      }
+      const contentElement = document.querySelector('.manga-content');
+      if (contentElement) {
+        contentElement.scrollTop = 0;
+      }
+      
+      // インターセクションオブザーバーを再設定
+      this.setupIntersectionObserver();
+      
+      console.log('[MangaViewer] 検索結果表示完了 - 最終状態:', { 
+        searchMode: this.isSearchResultMode, 
+        results: this.displayMangaList.length,
+        hasMorePages: this.hasMorePages,
+        nextCursor: this.nextCursor
+      });
+    }, 100);
+  }
+  
+  // 新着漫画かどうかを判定する（7日以内に追加された漫画）
+  private isNewManga(manga: Manga): boolean {
+    if (!manga.createdAt) return false;
+    
+    const createdDate = new Date(manga.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays <= 7; // 7日以内なら新着
+  }
+
+  // インターセクションオブザーバーのセットアップ
+  private setupIntersectionObserver(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    console.log('[DEBUG] Setting up intersection observer');
+    
+    // 前回のオブザーバーがあれば切断
+    if (this.intersectionObserver) {
+      this.intersectionObserver.disconnect();
+    }
+    
+    // 新しいオブザーバーを作成
+    const options = {
+      root: null, // ビューポートをルートとして使用
+      rootMargin: '50px', // 要素がビューポートの下部から50pxの位置に入ったら発火（より早めにトリガー）
+      threshold: 0.01 // 1%が見えた時点でコールバックを実行
+    };
+    
+    this.intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && this.hasMorePages && !this.isLoadingMore && this.isSearchResultMode) {
+          console.log('[DEBUG] Scroll observer triggered, loading more manga');
+          this.loadMoreData();
+        }
+      });
+    }, options);
+    
+    // 監視対象の要素を登録（ビューの更新後）
+    setTimeout(() => {
+      try {
+        if (this.scrollObserver && this.hasMorePages) {
+          console.log('[DEBUG] Observing scroll element');
+          this.intersectionObserver?.observe(this.scrollObserver.nativeElement);
+        } else {
+          console.log('[DEBUG] No scroll element found or no more pages available');
+        }
+      } catch (error) {
+        console.error('[DEBUG] Error setting up scroll observer:', error);
+      }
+    }, 100);
+    
+    // スクロールイベントリスナーも追加してバックアップとして機能させる
+    try {
+      // 既存のリスナーを削除
+      const searchResultsContainer = document.querySelector('.search-results-container');
+      if (searchResultsContainer) {
+        console.log('[DEBUG] Setting up scroll event listener on search results container');
+        
+        // スクロールハンドラ関数を定義
+        const scrollHandler = () => {
+          if (this.isLoadingMore || !this.hasMorePages || !this.isSearchResultMode) {
+            return;
+          }
+          
+          const container = searchResultsContainer as HTMLElement;
+          const scrollPosition = container.scrollTop + container.clientHeight;
+          const scrollHeight = container.scrollHeight;
+          
+          // スクロール位置が下部に近づいたら追加データをロード
+          // 閾値を減らして早めにロードを開始（スクロール位置が下部から150px以内に近づいたら）
+          if (scrollHeight - scrollPosition < 150) {
+            console.log('[DEBUG] Scroll event triggered, loading more manga');
+            console.log('[DEBUG] Scroll metrics:', {
+              scrollTop: container.scrollTop,
+              clientHeight: container.clientHeight,
+              scrollHeight: scrollHeight,
+              position: scrollPosition,
+              remaining: scrollHeight - scrollPosition
+            });
+            this.loadMoreData();
+          }
+        };
+        
+        // 既存のリスナーを削除
+        searchResultsContainer.removeEventListener('scroll', scrollHandler);
+        
+        // 新しいリスナーを追加
+        searchResultsContainer.addEventListener('scroll', scrollHandler);
+        console.log('[DEBUG] Scroll event listener added');
+      } else {
+        console.log('[DEBUG] Search results container not found');
+        
+        // フォールバック：documentのスクロールイベントを使用
+        const documentScrollHandler = () => {
+          if (this.isLoadingMore || !this.hasMorePages || !this.isSearchResultMode) {
+            return;
+          }
+          
+          const scrollPosition = window.scrollY + window.innerHeight;
+          const scrollHeight = document.body.scrollHeight;
+          
+          // スクロール位置が下部に近づいたら追加データをロード
+          if (scrollHeight - scrollPosition < 150) {
+            console.log('[DEBUG] Document scroll event triggered, loading more manga');
+            this.loadMoreData();
+          }
+        };
+        
+        // 既存のリスナーを削除して再設定
+        window.removeEventListener('scroll', documentScrollHandler);
+        window.addEventListener('scroll', documentScrollHandler);
+        console.log('[DEBUG] Document scroll event listener added as fallback');
+      }
+    } catch (error) {
+      console.error('[DEBUG] Error setting up scroll event listeners:', error);
+    }
+  }
+  
+  // サーバーから追加データをロード
+  loadMoreData(): void {
+    console.log('[DEBUG] loadMoreData called, isLoadingMore:', this.isLoadingMore);
+    if (this.isLoadingMore) return; // 重複実行防止
+    
+    // nextCursorがないのに呼び出された場合は終了
+    if (!this.nextCursor || !this.hasMorePages) {
+      console.log('[DEBUG] No next cursor or hasMorePages is false - cannot load more data');
       return;
     }
     
-    // 適切に漫画リストを更新する
-    if (this.isLoading && !this.isLoadingMore) {
-      // 新しい検索の場合は置き換え
-      this.mangaList = response.data;
-    } else if (this.isLoadingMore) {
-      // ページ読み込みの場合は追加（重複を避けるため）
-      // 新しく取得したデータを既存のリストに追加
-      const existingIds = new Set(this.mangaList.map(manga => manga.fanzaId));
-      const newItems = response.data.filter(manga => !existingIds.has(manga.fanzaId));
-      this.mangaList = [...this.mangaList, ...newItems];
+    // カーソル情報の整合性チェック
+    if (!this.nextCursor.lastId || !this.nextCursor.lastUpdatedAt) {
+      console.warn('[DEBUG] Next cursor has missing properties:', this.nextCursor);
+      // 最低限の情報を設定（空でも処理できるようにサーバー側で対応する必要あり）
+      if (!this.nextCursor.lastId) this.nextCursor.lastId = '';
+      if (!this.nextCursor.lastUpdatedAt) this.nextCursor.lastUpdatedAt = '';
     }
     
-    // Update pagination state - 安全に新しいオブジェクトとしてカーソルを保存
-    // 現在のカーソルはnextCursorのコピーを保存
-    if (this.nextCursor) {
-      this.currentCursor = {
-        lastId: String(this.nextCursor.lastId || ''),
-        lastUpdatedAt: String(this.nextCursor.lastUpdatedAt || '')
-      };
-    }
+    // ローディング状態を表示
+    this.isLoadingMore = true;
+    this.cdr.detectChanges();
     
-    // 新しいnextCursorを受け取る
-    if (response.nextCursor && response.nextCursor.lastId) {
-      this.nextCursor = {
-        lastId: String(response.nextCursor.lastId || ''),
-        lastUpdatedAt: String(response.nextCursor.lastUpdatedAt || '')
-      };
-      console.log('[DEBUG] New next cursor set:', this.nextCursor);
+    console.log('[DEBUG] Next cursor to be used:', JSON.stringify(this.nextCursor));
+    
+    // 少し遅延を入れてUIが反応する時間を確保
+    setTimeout(() => {
+      console.log('[DEBUG] Fetching more data with next page');
+      this.fetchNextPage();
+    }, 100);
+  }
+
+  // 表示用リストを更新
+  updateDisplayMangaList() {
+    this.displayMangaList = this.allMangaList.slice(this.currentOffset, this.currentOffset + this.PAGE_SIZE);
+  }
+
+  // 次のページへ
+  nextPage() {
+    // すでに取得済みのデータがあればスライスだけ
+    if (this.currentOffset + this.PAGE_SIZE < this.allMangaList.length) {
+      this.currentOffset += this.PAGE_SIZE;
+      this.updateDisplayMangaList();
+      if (this.displayMangaList.length > 0) {
+        this.currentIndex = 0;
+        this.updateCurrentManga(this.displayMangaList[0]);
+      }
+    } else if (this.hasMorePages && !this.isLoadingMore) {
+      // まだAPIで取得していない場合はAPI呼び出し
+      this.fetchNextPage();
+    }
+  }
+
+  // 前のページへ
+  previousPage() {
+    if (this.currentOffset - this.PAGE_SIZE >= 0) {
+      this.currentOffset -= this.PAGE_SIZE;
+      this.updateDisplayMangaList();
+      if (this.displayMangaList.length > 0) {
+        this.currentIndex = 0;
+        this.updateCurrentManga(this.displayMangaList[0]);
+      }
+    }
+  }
+
+  // ページネーションAPIレスポンス処理
+  private handlePaginatedResponse(response: PaginatedResponse<Manga>, isInitialSearch = false): void {
+    console.log('[MangaViewer] handlePaginatedResponse called');
+    console.log('[MangaViewer] Response data count:', response.data?.length || 0);
+    console.log('[MangaViewer] Has more:', response.hasMore);
+    console.log('[MangaViewer] Is initial search:', isInitialSearch);
+    console.log('[MangaViewer] Next cursor:', response.nextCursor ? JSON.stringify(response.nextCursor) : 'null');
+
+    // レスポンスデータがない場合は終了
+    if (!response || !response.data || response.data.length === 0) {
+      console.log('[MangaViewer] No data in response');
+      this.isLoading = false;
+      this.isLoadingMore = false;
+      this.cdr.detectChanges();
+      return;
+    }
+
+    // 初期検索の場合、全データとカーソル情報をリセット
+    if (isInitialSearch) {
+      console.log('[MangaViewer] Initial search - Resetting data and cursor');
+      this.allMangaList = [...response.data];
+      this.mangaList = [...response.data];
+      this.displayMangaList = [...response.data];
+      
+      // 次ページカーソルをDeep Copyして保存
+      if (response.nextCursor) {
+        this.nextCursor = {
+          lastId: response.nextCursor.lastId || '',
+          lastUpdatedAt: response.nextCursor.lastUpdatedAt || ''
+        };
+        
+        // Deep Copyした現在のカーソルを保存
+        this.currentCursor = {
+          lastId: response.nextCursor.lastId || '',
+          lastUpdatedAt: response.nextCursor.lastUpdatedAt || ''
+        };
+        
+        this.cursorHistory = [{
+          lastId: response.nextCursor.lastId || '',
+          lastUpdatedAt: response.nextCursor.lastUpdatedAt || ''
+        }];
+      } else {
+        this.currentCursor = null;
+        this.nextCursor = null;
+        this.cursorHistory = [];
+      }
+      
+      // さらにデータがあるかのフラグを設定
+      this.hasMorePages = !!response.hasMore;
+      
+      console.log('[MangaViewer] After reset - Current cursor:', this.currentCursor ? JSON.stringify(this.currentCursor) : 'null');
+      console.log('[MangaViewer] After reset - Next cursor:', this.nextCursor ? JSON.stringify(this.nextCursor) : 'null');
+      console.log('[MangaViewer] After reset - Has more pages:', this.hasMorePages);
     } else {
-      this.nextCursor = null;
-      console.log('[DEBUG] No next cursor available');
+      // 続きのデータ取得の場合
+      console.log('[MangaViewer] Loading more data - Appending data');
+      
+      // 重複チェック（fanzaIdを元に判断）
+      const existingFanzaIds = new Set(this.allMangaList.map(manga => manga.fanzaId));
+      const newData = response.data.filter(manga => !existingFanzaIds.has(manga.fanzaId));
+      
+      console.log('[MangaViewer] Existing data count:', this.allMangaList.length);
+      console.log('[MangaViewer] New unique data count:', newData.length);
+      console.log('[MangaViewer] Filtered duplicates:', response.data.length - newData.length);
+      
+      if (newData.length > 0) {
+        // 新しいデータを追加
+        this.allMangaList = [...this.allMangaList, ...newData];
+        this.mangaList = [...this.mangaList, ...newData];
+        
+        // 現在表示中の要素数を数える
+        const currentlyDisplayed = this.displayMangaList.length;
+        
+        // 現在のページに表示するべき残りのアイテム数を計算
+        const remainingNeeded = this.PAGE_SIZE - currentlyDisplayed;
+        
+        // 足りない分を新しいデータから追加
+        if (remainingNeeded > 0 && newData.length > 0) {
+          const itemsToAdd = newData.slice(0, remainingNeeded);
+          this.displayMangaList = [...this.displayMangaList, ...itemsToAdd];
+        }
+        
+        // 次ページカーソルをDeep Copyして保存
+        if (response.nextCursor) {
+          // 現在のカーソルを履歴に追加
+          if (response.nextCursor.lastId && response.nextCursor.lastUpdatedAt) {
+            this.currentCursor = {
+              lastId: response.nextCursor.lastId,
+              lastUpdatedAt: response.nextCursor.lastUpdatedAt
+            };
+            
+            // カーソル情報が重複しないように確認してから追加
+            const cursorExists = this.cursorHistory.some(cursor => 
+              cursor.lastId === this.currentCursor?.lastId && 
+              cursor.lastUpdatedAt === this.currentCursor?.lastUpdatedAt
+            );
+            
+            if (!cursorExists && this.currentCursor) {
+              this.cursorHistory.push({...this.currentCursor});
+            }
+            
+            // 次のカーソルを設定
+            this.nextCursor = {
+              lastId: response.nextCursor.lastId,
+              lastUpdatedAt: response.nextCursor.lastUpdatedAt
+            };
+            
+            console.log('[MangaViewer] Updated cursor history - length:', this.cursorHistory.length);
+            console.log('[MangaViewer] Updated current cursor:', JSON.stringify(this.currentCursor));
+            console.log('[MangaViewer] Updated next cursor:', JSON.stringify(this.nextCursor));
+          } else {
+            console.warn('[MangaViewer] Next cursor has missing properties:', response.nextCursor);
+          }
+        } else {
+          // 次のページがない場合
+          this.nextCursor = null;
+          console.log('[MangaViewer] No more pages available - next cursor set to null');
+        }
+        
+        // さらにデータがあるかのフラグを設定（APIレスポンスから直接更新）
+        this.hasMorePages = !!response.hasMore;
+        console.log('[MangaViewer] Updated has more pages flag:', this.hasMorePages);
+      } else {
+        console.log('[MangaViewer] No new unique data to add');
+        // 新しいデータがなくても次のカーソルが提供されている場合は更新
+        if (response.nextCursor && response.nextCursor.lastId && response.nextCursor.lastUpdatedAt) {
+          this.nextCursor = {
+            lastId: response.nextCursor.lastId,
+            lastUpdatedAt: response.nextCursor.lastUpdatedAt
+          };
+          console.log('[MangaViewer] Updated next cursor despite no new data:', JSON.stringify(this.nextCursor));
+        } else {
+          // 新しいデータもないし次のカーソルもない場合はもうページングを終了
+          this.hasMorePages = false;
+          console.log('[MangaViewer] No more pages available - setting hasMorePages to false');
+        }
+      }
     }
-    
-    this.hasMorePages = response.hasMore;
-    console.log('[DEBUG] Has more pages:', this.hasMorePages);
-    
-    // Update loading states
+
+    // データ取得済みの場合、読み込み中フラグを解除
     this.isLoading = false;
     this.isLoadingMore = false;
     
-    // If there are results and no current manga, update current manga
-    if (this.mangaList.length > 0 && !this.currentManga) {
-      this.updateCurrentManga(this.mangaList[0]);
+    // 表示リストを更新
+    this.updateDisplayMangaList();
+    
+    // 変更検知を強制
+    this.cdr.detectChanges();
+  }
+
+  // レスポンスデータのログ出力用ヘルパーメソッド
+  private logResponseData(response: PaginatedResponse<Manga>): void {
+    if (!response || !response.data) {
+      console.log('[DEBUG] レスポンスデータがありません');
+      return;
     }
+    
+    if (response.data.length === 0) {
+      console.log('[DEBUG] レスポンスデータは空配列です');
+      return;
+    }
+    
+    console.log('[DEBUG] 取得データ件数:', response.data.length);
+    console.log('[DEBUG] 取得データの最初のID:', response.data[0].fanzaId);
+    console.log('[DEBUG] 取得データの最後のID:', response.data[response.data.length - 1].fanzaId);
+    
+    if (response.nextCursor) {
+      console.log('[DEBUG] 次ページカーソル情報:', JSON.stringify(response.nextCursor));
+    } else {
+      console.log('[DEBUG] 次ページカーソル情報: なし');
+    }
+    
+    console.log('[DEBUG] さらにデータあり:', response.hasMore);
+  }
+
+  // fetchPreviousPageメソッドの代わりにリダイレクト用メソッドを追加
+  private fetchPreviousPage(): void {
+    this.previousPage();
   }
 }

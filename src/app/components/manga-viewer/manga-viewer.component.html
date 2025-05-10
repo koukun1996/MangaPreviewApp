@@ -20,7 +20,7 @@
   </div>
 
   <!-- 漫画データがある場合の表示 -->
-  <div *ngIf="mangaList.length > 0" class="manga-content">
+  <div class="manga-content" [class.search-mode]="isSearchResultMode">
     <div class="top-controls">
       <div class="manga-title-container" *ngIf="!isSearchResultMode && currentManga">
         {{ currentManga.title }}
@@ -58,117 +58,19 @@
       </ul>
     </div>
 
-    <!-- 検索コンテナとジャンル選択を統合 - オーバーレイ表示 -->
-    <div class="search-overlay" *ngIf="isSearchVisible" (click)="hideSearch()">
-      <div class="search-wrapper" [class.visible]="isSearchVisible" (click)="$event.stopPropagation()">
-        <div class="search-container">
-          <input
-            type="text"
-            class="search-input"
-            [(ngModel)]="searchTerm"
-            (ngModelChange)="onSearchChange($event)"
-            placeholder="タイトル、作者、タグで検索..."
-            (keydown.escape)="hideSearch()"
-            autofocus
-          />
-        </div>
-        
-        <!-- ジャンル選択部分を検索欄の下に配置 -->
-        <div class="genre-selection">
-          <div class="genre-header">
-            <h3>ジャンルで絞り込み</h3>
-            <div class="genre-toggle" (click)="toggleGenreList()" *ngIf="isMobileDevice">
-              <span>{{ isGenreListVisible ? '隠す' : '表示' }}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [style.transform]="isGenreListVisible ? 'rotate(180deg)' : 'rotate(0deg)'">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-          
-          <!-- 検索ボタンをジャンル絞り込みの直下に配置 -->
-          <div class="search-button-container">
-            <button class="search-button" (click)="executeSearch(); $event.stopPropagation();">
-              検索する
-            </button>
-          </div>
-          
-          <div class="genre-list-container" [class.visible]="isGenreListVisible || !isMobileDevice">
-            <div class="selected-genre" *ngIf="selectedGenres.length > 0">
-              <div class="selected-genres-header">
-                <span>選択中のジャンル: {{ selectedGenres.length }}件 (複数選択可能)</span>
-                <button class="clear-all-genres" (click)="clearAllGenres()">すべて解除</button>
-              </div>
-              <div class="selected-genres-container">
-                <div class="genre-badge" *ngFor="let genre of selectedGenres">
-                  {{ genre }} <span class="clear-genre" (click)="selectGenre(genre)">×</span>
-                </div>
-              </div>
-            </div>
-            
-            <div class="genres-section-title" *ngIf="genres.length > 0">
-              利用可能なジャンル一覧 ({{ genres.length }}種類)
-            </div>
-            
-            <div class="genre-list">
-              <div 
-                *ngFor="let genre of genres" 
-                class="genre-tag" 
-                [class.active]="genre.active"
-                (click)="selectGenre(genre.genre)"
-              >
-                <span class="genre-name">{{ genre.genre }}</span>
-                <span class="genre-count">({{ genre.count }})</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- 検索コンポーネント -->
+    <app-manga-search 
+      *ngIf="isSearchVisible" 
+      [isMobileDevice]="isMobileDevice"
+      (searchResults)="handleSearchResults($event)"
+      (closeSearch)="hideSearch()">
+    </app-manga-search>
 
-    <!-- 検索結果表示モード（4枚グリッド表示） -->
-    <div *ngIf="isSearchResultMode" class="manga-grid-container">
-      <div class="search-mode-header">
-        <h2>検索結果</h2>
-        <button class="back-to-normal" (click)="exitSearchResultMode()">戻る</button>
-      </div>
-      
-      <div class="manga-grid">
-        <div *ngFor="let manga of mangaList" class="manga-card" (click)="selectMangaAndExit(manga)">
-          <div class="manga-thumbnail">
-            <img [src]="manga.thumbnailUrl" [alt]="manga.title" loading="lazy">
-          </div>
-          <div class="manga-info">
-            <h3 class="manga-title">{{ manga.title }}</h3>
-            <p class="manga-author">{{ manga.author }}</p>
-          </div>
-        </div>
-      </div>
-      
-      <!-- ページネーションコントロール -->
-      <div class="pagination-controls" *ngIf="mangaList.length > 0">
-        <button (click)="fetchPreviousPage()" class="pagination-button" 
-                [disabled]="isLoading || cursorHistory.length === 0">
-          前のページ
-        </button>
-        <button (click)="fetchNextPage()" class="pagination-button" 
-                [disabled]="isLoading || !hasMorePages">
-          次のページ
-        </button>
-      </div>
-      
-      <!-- ローディング表示（追加データ読み込み中） -->
-      <div *ngIf="isLoadingMore" class="loading-more">
-        <div class="loading-spinner-small"></div>
-        <p>もっと読み込み中...</p>
-      </div>
-    </div>
-
-    <!-- 通常表示モード（単一漫画表示） -->
-    <div *ngIf="!isSearchResultMode && currentManga" class="manga-single-container">
-      
+    <!-- 通常表示モード -->
+    <div *ngIf="!isSearchResultMode" class="manga-single-container">
       <div class="manga-image-wrapper">
         <div class="manga-image-container" (click)="!isMobileDevice && goToTachiyomi()">
-          <img [src]="getCurrentImage()" [alt]="currentManga.title" (load)="onImageLoad()" />
+          <img [src]="getCurrentImage()" [alt]="currentManga?.title" (load)="onImageLoad()" />
         </div>
       </div>
       
@@ -178,16 +80,54 @@
                   [disabled]="isLoading || (currentIndex === 0 && cursorHistory.length === 0)">
             前へ
           </button>
-          <button (click)="goToTachiyomi()" [disabled]="!currentManga.tachiyomiUrl" class="tachiyomi-button">
+          <button (click)="goToTachiyomi()" [disabled]="!currentManga?.tachiyomiUrl" class="tachiyomi-button">
             立読ページへ
           </button>
-          <button (click)="getRecommendations()" class="recommend-button" [disabled]="isLoading || !currentManga">
-            似た作品
+          <button (click)="goToProduct()" class="purchase-button" [disabled]="!currentManga?.affiliateUrl">
+            商品ページへ
           </button>
           <button (click)="nextManga()" class="nav-button" [disabled]="isLoading || (!hasMorePages && currentIndex === mangaList.length - 1)">
             次へ
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- 検索結果表示モード -->
+    <div *ngIf="isSearchResultMode" class="search-results-container">
+      <div class="search-header">
+        <h2>検索結果（{{displayGenre}}）</h2>
+        <div class="search-controls">
+          <button (click)="exitSearchResultMode()">戻る</button>
+        </div>
+      </div>
+      
+      <!-- 検索結果一覧 -->
+      <div class="manga-grid-container">
+        <div *ngFor="let manga of allMangaList; let i = index" class="manga-card" (click)="selectMangaAndExit(manga, i)">
+          <div class="manga-card-image">
+            <img 
+              [src]="manga.thumbnailUrl || 'assets/images/placeholder.png'" 
+              [alt]="manga.title" 
+              (error)="onImageError()" 
+              loading="lazy">
+            <div *ngIf="manga.isNew" class="manga-badge">新着</div>
+            <!-- 画像上に情報表示パネルを追加 (常に表示) -->
+            <div class="manga-image-overlay">
+              <div class="overlay-title">{{manga.title || '無題'}}</div>
+              <div class="overlay-author">{{manga.author || '作者不明'}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- スクロール検知要素 -->
+      <div #scrollObserver class="scroll-observer"></div>
+      
+      <!-- ローディング表示 -->
+      <div *ngIf="isLoadingMore" class="loading-more">
+        <div class="loading-spinner small"></div>
+        <p>読み込み中...</p>
       </div>
     </div>
   </div>
